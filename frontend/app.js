@@ -527,28 +527,56 @@ function openCompleteModal(taskId) {
   activeTaskId = taskId;
 
   const checklist = document.getElementById('modal-checklist');
-  // Build checklist with text-only content (no HTML injection from data)
   checklist.innerHTML = '';
-  task.items.forEach((item, i) => {
-    const label = document.createElement('label');
-    label.className = 'checklist-item';
 
-    const cb = document.createElement('input');
-    cb.type = 'checkbox';
-    cb.className = 'return-check';
-    cb.dataset.index = i;
-    cb.addEventListener('change', () => {
-      label.classList.toggle('checked', cb.checked);
+  task.items.forEach(item => {
+    const row = document.createElement('div');
+    row.className = 'override-item-row';  // reuse the same row style as Override modal
+
+    // Name + "taken" label
+    const nameEl = document.createElement('span');
+    nameEl.className = 'override-item-name';
+    nameEl.textContent = item.name;
+
+    const takenEl = document.createElement('span');
+    takenEl.className = 'override-item-avail';
+    takenEl.textContent = `taken: ${item.qty}`;
+
+    const btnMinus = document.createElement('button');
+    btnMinus.className = 'btn btn-qty';
+    btnMinus.type = 'button';
+    btnMinus.textContent = '\u2212';
+
+    const qtyInput = document.createElement('input');
+    qtyInput.type = 'number';
+    qtyInput.className = 'qty-input return-qty';
+    qtyInput.value = item.qty;   // default to full return
+    qtyInput.min = 0;
+    qtyInput.max = item.qty;
+    qtyInput.dataset.item = item.name;
+    qtyInput.dataset.max  = item.qty;
+
+    const btnPlus = document.createElement('button');
+    btnPlus.className = 'btn btn-qty';
+    btnPlus.type = 'button';
+    btnPlus.textContent = '+';
+
+    btnMinus.addEventListener('click', () => {
+      qtyInput.value = Math.max(0, parseInt(qtyInput.value || 0) - 1);
       updateConfirmBtn();
     });
+    btnPlus.addEventListener('click', () => {
+      qtyInput.value = Math.min(item.qty, parseInt(qtyInput.value || 0) + 1);
+      updateConfirmBtn();
+    });
+    qtyInput.addEventListener('input', updateConfirmBtn);
 
-    const span = document.createElement('span');
-    // Safe text assignment — no innerHTML
-    span.textContent = `${item.name} \u00D7 ${item.qty}`;
-
-    label.appendChild(cb);
-    label.appendChild(span);
-    checklist.appendChild(label);
+    row.appendChild(nameEl);
+    row.appendChild(btnMinus);
+    row.appendChild(qtyInput);
+    row.appendChild(btnPlus);
+    row.appendChild(takenEl);
+    checklist.appendChild(row);
   });
 
   updateConfirmBtn();
@@ -556,8 +584,10 @@ function openCompleteModal(taskId) {
 }
 
 function updateConfirmBtn() {
-  const allChecked = [...document.querySelectorAll('.return-check')].every(c => c.checked);
-  document.getElementById('modal-confirm').disabled = !allChecked;
+  // Enable confirm if at least one item has a return qty > 0
+  const anyReturned = [...document.querySelectorAll('.return-qty')]
+    .some(inp => parseInt(inp.value || 0) > 0);
+  document.getElementById('modal-confirm').disabled = !anyReturned;
 }
 
 function closeModal() {
@@ -572,9 +602,12 @@ document.getElementById('modal-confirm').addEventListener('click', () => {
   const task = TASKS.find(t => t.id === activeTaskId);
   if (task) {
     task.status = 'COMPLETE';
-    task.items.forEach(item => {
-      const inv = INVENTORY.find(i => i.name === item.name);
-      if (inv) inv.qty = Math.min(inv.total, inv.qty + item.qty);
+    // Return only the quantities the user entered
+    document.querySelectorAll('.return-qty').forEach(inp => {
+      const returned = parseInt(inp.value || 0);
+      if (returned <= 0) return;
+      const inv = INVENTORY.find(i => i.name === inp.dataset.item);
+      if (inv) inv.qty = Math.min(inv.total, inv.qty + returned);
     });
     // If the completed task was selected, move selection to next available
     if (selectedTaskId === activeTaskId) {
