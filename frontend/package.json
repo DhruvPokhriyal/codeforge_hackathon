@@ -1,11 +1,11 @@
 {
-    "name": "emergency-hub",
+    "name": "digital-lifeboat",
     "version": "1.0.0",
-    "description": "Offline Emergency Intelligence Hub — Electron + FastAPI",
+    "description": "Digital Lifeboat — Offline Disaster Relief Command Centre (Electron)",
     "main": "electron/main.js",
     "scripts": {
         "start": "electron .",
-        "dev": "electron . --dev"
+        "dev": "electron . --inspect"
     },
     "dependencies": {
         "electron": "^28.0.0"

@@ -1,118 +1,154 @@
-<!doctype html>
-<html lang="en">
-    <head>
-        <meta charset="UTF-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <!-- CSP: only load local resources — no external network calls -->
-        <meta
-            http-equiv="Content-Security-Policy"
-            content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline';"
-        />
-        <title>Emergency Intelligence Hub</title>
-        <link rel="stylesheet" href="styles.css" />
-    </head>
-    <body>
-        <!-- ── Header ───────────────────────────────────────────────────────────── -->
-        <header class="app-header">
-            <h1>🚨 Emergency Intelligence Hub</h1>
-            <span
-                class="status-dot"
-                id="status-dot"
-                title="Backend status"
-            ></span>
-        </header>
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline';" />
+  <title>Digital Lifeboat</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
 
-        <main class="layout">
-            <!-- ── Left column: Input + HITL ────────────────────────────────────── -->
-            <section class="column column--left">
-                <!-- Audio Input Panel -->
-                <div class="panel" id="input-panel">
-                    <h2>Audio Input</h2>
-                    <label for="audio-file">Upload distress audio:</label>
-                    <input
-                        type="file"
-                        id="audio-file"
-                        accept=".wav,.mp3,.flac,.ogg,.m4a"
-                    />
-                    <button id="btn-process" class="btn btn--primary">
-                        ▶ Process Audio
-                    </button>
-                    <div id="processing-status" class="status-text"></div>
-                </div>
+  <!-- ── Theme Switcher ──────────────────────────────────────────────────────── -->
+  <div class="theme-switcher">
+    <button class="theme-btn" data-theme="light">LIGHT</button>
+    <button class="theme-btn" data-theme="dark">DARK</button>
+    <button class="theme-btn" data-theme="hc">HC</button>
+  </div>
 
-                <!-- HITL Report Panel (shown after /pipeline returns) -->
-                <div class="panel hidden" id="hitl-panel">
-                    <h2>Triage Report</h2>
-                    <p class="request-id" id="report-request-id"></p>
-                    <p class="transcript-text" id="report-transcript"></p>
-                    <div id="situation-cards"></div>
+  <!-- ── 3-Column Command Center ─────────────────────────────────────────────── -->
+  <div class="layout">
 
-                    <!-- Manual override -->
-                    <details class="manual-override">
-                        <summary>⚙️ Manual Override</summary>
-                        <input
-                            id="manual-condition"
-                            placeholder="Condition description"
-                        />
-                        <input
-                            id="manual-items"
-                            placeholder="Items (comma-separated)"
-                        />
-                    </details>
+    <!-- ═══════════════ COLUMN 1 · Intake & Inventory ═══════════════ -->
+    <section class="col col-intake">
 
-                    <button id="btn-approve" class="btn btn--approve">
-                        ✅ Approve &amp; Dispatch
-                    </button>
-                </div>
-            </section>
+      <div class="hub-header">
+        <div class="hub-name">EMERGENCY HUB</div>
+        <div class="hub-sub">Status: <span class="status-active">ACTIVE</span></div>
+      </div>
+      <hr class="divider" />
 
-            <!-- ── Right column: Queue + Volunteers + Inventory ─────────────────── -->
-            <section class="column column--right">
-                <!-- Panel A: Priority Queue -->
-                <div class="panel" id="queue-panel">
-                    <h2>Priority Queue</h2>
-                    <table class="data-table" id="queue-table">
-                        <thead>
-                            <tr>
-                                <th>REQ-ID</th>
-                                <th>Severity</th>
-                                <th>Status</th>
-                                <th>Volunteer</th>
-                                <th>Key</th>
-                            </tr>
-                        </thead>
-                        <tbody id="queue-tbody"></tbody>
-                    </table>
-                </div>
+      <div class="section-label">INVENTORY</div>
+      <div class="inventory-list" id="inventory-list">
+        <!-- Rendered by app.js -->
+      </div>
 
-                <!-- Panel B: Volunteer Activity Board -->
-                <div class="panel" id="volunteer-panel">
-                    <h2>Volunteer Activity</h2>
-                    <div id="volunteer-cards"></div>
-                </div>
+      <hr class="divider" />
 
-                <!-- Panel C: Inventory -->
-                <div class="panel" id="inventory-panel">
-                    <h2>Inventory</h2>
-                    <button class="btn btn--secondary" id="btn-refill">
-                        ♻ Partial Refill
-                    </button>
-                    <table class="data-table" id="inventory-table">
-                        <thead>
-                            <tr>
-                                <th>Item</th>
-                                <th>Available</th>
-                                <th>Reserved</th>
-                                <th>Total</th>
-                                <th>Bin</th>
-                            </tr>
-                        </thead>
-                        <tbody id="inventory-tbody"></tbody>
-                    </table>
-                </div>
-            </section>
-        </main>
+      <div class="section-label">AUDIO INTAKE</div>
+      <div class="audio-row">
+        <span class="audio-icon">&#x1F50A;</span>
+        <div class="waveform" id="waveform">
+          <div class="wave-bar" style="--bh:60%"></div>
+          <div class="wave-bar" style="--bh:85%"></div>
+          <div class="wave-bar" style="--bh:40%"></div>
+          <div class="wave-bar" style="--bh:70%"></div>
+          <div class="wave-bar" style="--bh:20%"></div>
+          <div class="wave-bar" style="--bh:95%"></div>
+          <div class="wave-bar" style="--bh:55%"></div>
+          <div class="wave-bar" style="--bh:75%"></div>
+        </div>
+      </div>
 
-        <script src="app.js"></script>
-    </body>
+      <hr class="divider" />
+
+      <div class="section-label">UPLOAD AUDIO</div>
+      <div class="upload-zone" id="upload-zone">
+        <input type="file" id="audio-file" accept=".mp3,.wav" />
+        <div class="upload-label" id="upload-label">
+          Click to upload<br />or drag &amp; drop
+        </div>
+      </div>
+      <button class="btn btn-process" id="btn-process">PROCESS MEMO</button>
+      <div class="process-status hidden" id="process-status">&#x23F3; Denoising &amp; Transcribing...</div>
+
+    </section>
+
+    <!-- ═══════════════ COLUMN 2 · Priority Queue ═══════════════ -->
+    <section class="col col-queue">
+
+      <div class="queue-header-row">
+        <div class="queue-title">PRIORITY QUEUE</div>
+        <div class="queue-count">Active incidents: <span id="incident-count">3</span></div>
+      </div>
+      <hr class="divider" />
+
+      <div id="task-list">
+        <!-- Task cards rendered by app.js -->
+      </div>
+
+    </section>
+
+    <!-- ═══════════════ COLUMN 3 · AI Logic & Agent Handoff ═══════════════ -->
+    <section class="col col-ai">
+
+      <div class="ai-title">AI REVIEW</div>
+      <hr class="divider" />
+
+      <!-- Fully populated by renderAiPanel() in app.js -->
+      <div id="ai-panel-content" class="ai-panel-scroll">
+        <div class="ai-no-selection" id="ai-no-selection">
+          &#x25B6;&nbsp; Select a task to view AI analysis
+        </div>
+      </div>
+
+      <div class="ai-actions">
+        <button class="btn btn-approve" id="btn-approve">APPROVE</button>
+        <button class="btn btn-override" id="btn-override">OVERRIDE</button>
+      </div>
+
+    </section>
+  </div>
+
+  <!-- ── Override Modal ──────────────────────────────────────────────────────── -->
+  <div class="modal-overlay hidden" id="override-overlay"
+       role="dialog" aria-modal="true" aria-labelledby="override-title">
+    <div class="modal modal-override">
+      <h2 class="modal-title" id="override-title">MANUAL OVERRIDE</h2>
+      <p class="modal-sub">Define the override situation and required resources:</p>
+
+      <div class="override-field">
+        <label class="override-label" for="override-situation">SITUATION</label>
+        <input type="text" id="override-situation" class="override-input"
+               placeholder="e.g. Bridge collapse - Route 9" />
+      </div>
+
+      <div class="override-field">
+        <label class="override-label" for="override-steps">STEPS TO TAKE</label>
+        <textarea id="override-steps" class="override-textarea" rows="3"
+                  placeholder="Describe response steps in order..."></textarea>
+      </div>
+
+      <div class="override-field">
+        <div class="override-label">RESOURCES REQUIRED</div>
+        <div class="override-items" id="override-items">
+          <!-- Rendered by app.js from INVENTORY -->
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-override-submit" id="override-submit">APPLY OVERRIDE</button>
+        <button class="btn btn-cancel" id="override-cancel">CANCEL</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Complete & Returned Modal ───────────────────────────────────────────── -->
+  <div class="modal-overlay hidden" id="modal-overlay"
+       role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal">
+      <h2 class="modal-title" id="modal-title">COMPLETE &amp; RETURNED</h2>
+      <p class="modal-sub">Check off all items returned to inventory before clearing the task:</p>
+      <div class="modal-checklist" id="modal-checklist"></div>
+      <p class="modal-note" id="modal-note">All items must be checked to confirm.</p>
+      <div class="modal-footer">
+        <button class="btn btn-confirm" id="modal-confirm" disabled>CONFIRM RETURN</button>
+        <button class="btn btn-cancel" id="modal-cancel">CANCEL</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
 </html>
