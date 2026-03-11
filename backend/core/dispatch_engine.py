@@ -19,11 +19,11 @@ from config import VOLUNTEER_COUNT
 # ── Volunteer state store ─────────────────────────────────────────────────────
 VOLUNTEERS: dict[str, dict] = {
     f"V-{i:02d}": {
-        "status":          "AVAILABLE",
-        "request_id":      None,
-        "assigned_at":     None,
+        "status": "AVAILABLE",
+        "request_id": None,
+        "assigned_at": None,
         "expected_return": None,
-        "items_taken":     [],
+        "items_taken": [],
     }
     for i in range(1, VOLUNTEER_COUNT + 1)
 }
@@ -42,7 +42,7 @@ def dispatch(queue) -> dict | None:
     Assign the highest-priority PENDING request to a free volunteer.
     Returns {volunteer, request_id} on success, None if no pending or no free vol.
     """
-    top  = queue.peek_top_pending()
+    top = queue.peek_top_pending()
     if not top:
         return None
     free = get_free_volunteer()
@@ -56,7 +56,7 @@ def dispatch(queue) -> dict | None:
     if not selected:
         selected = top["situations"][:1]
 
-    travel  = selected[0]["travel_time_min"]
+    travel = selected[0]["travel_time_min"]
     resolve = selected[0]["resolution_time_min"]
     exp_return = (now + timedelta(minutes=travel + resolve)).strftime("%H:%M:%S")
 
@@ -68,20 +68,25 @@ def dispatch(queue) -> dict | None:
         if mat.get("available")
     ]
 
-    VOLUNTEERS[free].update({
-        "status":          "BUSY",
-        "request_id":      top["request_id"],
-        "assigned_at":     now.strftime("%H:%M:%S"),
-        "expected_return": exp_return,
-        "items_taken":     items_taken,
-    })
-    queue.update(top["request_id"], {
-        "status":             "ASSIGNED",
-        "assigned_volunteer": free,
-        "assigned_at":        now.strftime("%H:%M:%S"),
-        "expected_return":    exp_return,
-        "items_taken":        items_taken,
-    })
+    VOLUNTEERS[free].update(
+        {
+            "status": "BUSY",
+            "request_id": top["request_id"],
+            "assigned_at": now.strftime("%H:%M:%S"),
+            "expected_return": exp_return,
+            "items_taken": items_taken,
+        }
+    )
+    queue.update(
+        top["request_id"],
+        {
+            "status": "ASSIGNED",
+            "assigned_volunteer": free,
+            "assigned_at": now.strftime("%H:%M:%S"),
+            "expected_return": exp_return,
+            "items_taken": items_taken,
+        },
+    )
     return {"volunteer": free, "request_id": top["request_id"]}
 
 
@@ -99,23 +104,26 @@ def volunteer_return(
     · Immediately re-runs dispatch for next pending task
     """
     req_id = VOLUNTEERS[volunteer_id]["request_id"]
-    now    = datetime.now().strftime("%H:%M:%S")
+    now = datetime.now().strftime("%H:%M:%S")
 
     for item in returned_items:
         inventory_mgr.restore(item["item"], item["quantity"])
 
-    queue.update(req_id, {
-        "status":          "RESOLVED",
-        "actual_return":   now,
-        "items_returned":  returned_items,
-    })
+    queue.update(
+        req_id,
+        {
+            "status": "RESOLVED",
+            "actual_return": now,
+            "items_returned": returned_items,
+        },
+    )
 
     VOLUNTEERS[volunteer_id] = {
-        "status":          "AVAILABLE",
-        "request_id":      None,
-        "assigned_at":     None,
+        "status": "AVAILABLE",
+        "request_id": None,
+        "assigned_at": None,
         "expected_return": None,
-        "items_taken":     [],
+        "items_taken": [],
     }
 
-    dispatch(queue)   # immediately check for next pending task
+    dispatch(queue)  # immediately check for next pending task
