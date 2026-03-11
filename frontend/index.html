@@ -1,107 +1,118 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <!-- CSP: only load local resources — no external network calls -->
-  <meta http-equiv="Content-Security-Policy"
-        content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline';" />
-  <title>Emergency Intelligence Hub</title>
-  <link rel="stylesheet" href="styles.css" />
-</head>
-<body>
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <!-- CSP: only load local resources — no external network calls -->
+        <meta
+            http-equiv="Content-Security-Policy"
+            content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline';"
+        />
+        <title>Emergency Intelligence Hub</title>
+        <link rel="stylesheet" href="styles.css" />
+    </head>
+    <body>
+        <!-- ── Header ───────────────────────────────────────────────────────────── -->
+        <header class="app-header">
+            <h1>🚨 Emergency Intelligence Hub</h1>
+            <span
+                class="status-dot"
+                id="status-dot"
+                title="Backend status"
+            ></span>
+        </header>
 
-  <!-- ── Header ───────────────────────────────────────────────────────────── -->
-  <header class="app-header">
-    <h1>🚨 Emergency Intelligence Hub</h1>
-    <span class="status-dot" id="status-dot" title="Backend status"></span>
-  </header>
+        <main class="layout">
+            <!-- ── Left column: Input + HITL ────────────────────────────────────── -->
+            <section class="column column--left">
+                <!-- Audio Input Panel -->
+                <div class="panel" id="input-panel">
+                    <h2>Audio Input</h2>
+                    <label for="audio-file">Upload distress audio:</label>
+                    <input
+                        type="file"
+                        id="audio-file"
+                        accept=".wav,.mp3,.flac,.ogg,.m4a"
+                    />
+                    <button id="btn-process" class="btn btn--primary">
+                        ▶ Process Audio
+                    </button>
+                    <div id="processing-status" class="status-text"></div>
+                </div>
 
-  <main class="layout">
+                <!-- HITL Report Panel (shown after /pipeline returns) -->
+                <div class="panel hidden" id="hitl-panel">
+                    <h2>Triage Report</h2>
+                    <p class="request-id" id="report-request-id"></p>
+                    <p class="transcript-text" id="report-transcript"></p>
+                    <div id="situation-cards"></div>
 
-    <!-- ── Left column: Input + HITL ────────────────────────────────────── -->
-    <section class="column column--left">
+                    <!-- Manual override -->
+                    <details class="manual-override">
+                        <summary>⚙️ Manual Override</summary>
+                        <input
+                            id="manual-condition"
+                            placeholder="Condition description"
+                        />
+                        <input
+                            id="manual-items"
+                            placeholder="Items (comma-separated)"
+                        />
+                    </details>
 
-      <!-- Audio Input Panel -->
-      <div class="panel" id="input-panel">
-        <h2>Audio Input</h2>
-        <label for="audio-file">Upload distress audio:</label>
-        <input type="file" id="audio-file" accept=".wav,.mp3,.flac,.ogg,.m4a" />
-        <button id="btn-process" class="btn btn--primary">
-          ▶ Process Audio
-        </button>
-        <div id="processing-status" class="status-text"></div>
-      </div>
+                    <button id="btn-approve" class="btn btn--approve">
+                        ✅ Approve &amp; Dispatch
+                    </button>
+                </div>
+            </section>
 
-      <!-- HITL Report Panel (shown after /pipeline returns) -->
-      <div class="panel hidden" id="hitl-panel">
-        <h2>Triage Report</h2>
-        <p class="request-id" id="report-request-id"></p>
-        <p class="transcript-text" id="report-transcript"></p>
-        <div id="situation-cards"></div>
+            <!-- ── Right column: Queue + Volunteers + Inventory ─────────────────── -->
+            <section class="column column--right">
+                <!-- Panel A: Priority Queue -->
+                <div class="panel" id="queue-panel">
+                    <h2>Priority Queue</h2>
+                    <table class="data-table" id="queue-table">
+                        <thead>
+                            <tr>
+                                <th>REQ-ID</th>
+                                <th>Severity</th>
+                                <th>Status</th>
+                                <th>Volunteer</th>
+                                <th>Key</th>
+                            </tr>
+                        </thead>
+                        <tbody id="queue-tbody"></tbody>
+                    </table>
+                </div>
 
-        <!-- Manual override -->
-        <details class="manual-override">
-          <summary>⚙️ Manual Override</summary>
-          <input id="manual-condition" placeholder="Condition description" />
-          <input id="manual-items" placeholder="Items (comma-separated)" />
-        </details>
+                <!-- Panel B: Volunteer Activity Board -->
+                <div class="panel" id="volunteer-panel">
+                    <h2>Volunteer Activity</h2>
+                    <div id="volunteer-cards"></div>
+                </div>
 
-        <button id="btn-approve" class="btn btn--approve">
-          ✅ Approve &amp; Dispatch
-        </button>
-      </div>
+                <!-- Panel C: Inventory -->
+                <div class="panel" id="inventory-panel">
+                    <h2>Inventory</h2>
+                    <button class="btn btn--secondary" id="btn-refill">
+                        ♻ Partial Refill
+                    </button>
+                    <table class="data-table" id="inventory-table">
+                        <thead>
+                            <tr>
+                                <th>Item</th>
+                                <th>Available</th>
+                                <th>Reserved</th>
+                                <th>Total</th>
+                                <th>Bin</th>
+                            </tr>
+                        </thead>
+                        <tbody id="inventory-tbody"></tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
 
-    </section>
-
-    <!-- ── Right column: Queue + Volunteers + Inventory ─────────────────── -->
-    <section class="column column--right">
-
-      <!-- Panel A: Priority Queue -->
-      <div class="panel" id="queue-panel">
-        <h2>Priority Queue</h2>
-        <table class="data-table" id="queue-table">
-          <thead>
-            <tr>
-              <th>REQ-ID</th>
-              <th>Severity</th>
-              <th>Status</th>
-              <th>Volunteer</th>
-              <th>Key</th>
-            </tr>
-          </thead>
-          <tbody id="queue-tbody"></tbody>
-        </table>
-      </div>
-
-      <!-- Panel B: Volunteer Activity Board -->
-      <div class="panel" id="volunteer-panel">
-        <h2>Volunteer Activity</h2>
-        <div id="volunteer-cards"></div>
-      </div>
-
-      <!-- Panel C: Inventory -->
-      <div class="panel" id="inventory-panel">
-        <h2>Inventory</h2>
-        <button class="btn btn--secondary" id="btn-refill">♻ Partial Refill</button>
-        <table class="data-table" id="inventory-table">
-          <thead>
-            <tr>
-              <th>Item</th>
-              <th>Available</th>
-              <th>Reserved</th>
-              <th>Total</th>
-              <th>Bin</th>
-            </tr>
-          </thead>
-          <tbody id="inventory-tbody"></tbody>
-        </table>
-      </div>
-
-    </section>
-
-  </main>
-
-  <script src="app.js"></script>
-</body>
+        <script src="app.js"></script>
+    </body>
 </html>

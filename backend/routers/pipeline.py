@@ -41,6 +41,7 @@ def _get_llm():
     if _llm is None:
         from llama_cpp import Llama
         from config import LLAMA_MODEL_PATH, LLM_CONTEXT_SIZE
+
         _llm = Llama(model_path=LLAMA_MODEL_PATH, n_ctx=LLM_CONTEXT_SIZE, verbose=False)
     return _llm
 
@@ -51,7 +52,7 @@ async def run_pipeline(body: PipelineRequest):
     handoff_logs: list[dict] = []
 
     # Step 1 — Decode and save audio
-    raw_path  = save_base64_wav(body.audio_b64, request_id)
+    raw_path = save_base64_wav(body.audio_b64, request_id)
     clean_path = get_clean_path(request_id)
 
     # Step 2 — Denoise
@@ -63,42 +64,57 @@ async def run_pipeline(body: PipelineRequest):
     transcript = transcribe(clean_path)
 
     # Step 4 — Retrieve RAG chunks
-    log_handoff("INTAKE_AGENT", "RETRIEVAL_AGENT", "transcribed", {"transcript": transcript})
+    log_handoff(
+        "INTAKE_AGENT", "RETRIEVAL_AGENT", "transcribed", {"transcript": transcript}
+    )
     retrieval = retrieve(transcript)
-    chunks    = retrieval["chunks"]
+    chunks = retrieval["chunks"]
 
     # Step 4b — Vagueness resolution
     if retrieval["is_vague"]:
         log_handoff(
-            "RETRIEVAL_AGENT", "VAGUENESS_AGENT",
+            "RETRIEVAL_AGENT",
+            "VAGUENESS_AGENT",
             f"top_score={retrieval['top_score']:.2f} < threshold=0.8",
             {"transcript": transcript, "top_score": retrieval["top_score"]},
         )
-        handoff_logs.append({
-            "step": "vagueness_resolved",
-            "reason": f"low confidence ({retrieval['top_score']:.2f})",
-        })
+        handoff_logs.append(
+            {
+                "step": "vagueness_resolved",
+                "reason": f"low confidence ({retrieval['top_score']:.2f})",
+            }
+        )
         chunks = resolve_and_retrieve(transcript, _get_llm(), retrieve)
 
     # Step 5 — RAG triage
-    log_handoff("RETRIEVAL_AGENT", "RAG_TRIAGE_AGENT", "chunks ready", {"chunk_count": len(chunks)})
+    log_handoff(
+        "RETRIEVAL_AGENT",
+        "RAG_TRIAGE_AGENT",
+        "chunks ready",
+        {"chunk_count": len(chunks)},
+    )
     situations = run_rag_triage(transcript, chunks, _get_llm())
 
     # Step 6 — Inventory annotation
-    log_handoff("RAG_TRIAGE_AGENT", "LOGISTICS_AGENT", "situations ready", {"count": len(situations)})
+    log_handoff(
+        "RAG_TRIAGE_AGENT",
+        "LOGISTICS_AGENT",
+        "situations ready",
+        {"count": len(situations)},
+    )
     situations = annotate_situations(situations)
 
     # Store request
     request = {
-        "request_id":      request_id,
+        "request_id": request_id,
         "time_of_request": datetime.now().isoformat(),
-        "transcript":      transcript,
-        "is_vague":        retrieval["is_vague"],
-        "situations":      situations,
-        "status":          "PENDING",
-        "heap_key":        max(s["heap_key"] for s in situations) if situations else 0,
+        "transcript": transcript,
+        "is_vague": retrieval["is_vague"],
+        "situations": situations,
+        "status": "PENDING",
+        "heap_key": max(s["heap_key"] for s in situations) if situations else 0,
         "escalation_stage": 0,
-        "handoff_logs":    handoff_logs,
+        "handoff_logs": handoff_logs,
     }
     request_store.add(request)
     # Not pushed to priority_queue yet — waits for HITL approval (POST /approve)

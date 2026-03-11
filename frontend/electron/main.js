@@ -10,74 +10,76 @@
 // Security: webPreferences enforces contextIsolation + no nodeIntegration.
 // All IPC is channeled through preload.js (contextBridge).
 
-const { app, BrowserWindow } = require('electron')
-const path = require('path')
-const { spawn } = require('child_process')
-const http = require('http')
+const { app, BrowserWindow } = require("electron");
+const path = require("path");
+const { spawn } = require("child_process");
+const http = require("http");
 
-const API_BASE = 'http://127.0.0.1:8000'
-let backendProcess = null
-let mainWindow = null
+const API_BASE = "http://127.0.0.1:8000";
+let backendProcess = null;
+let mainWindow = null;
 
 // ── Launch Python backend ────────────────────────────────────────────────────
 function startBackend() {
-  const backendPath = path.join(__dirname, '..', '..', 'backend', 'main.py')
-  backendProcess = spawn('python', [backendPath], {
-    cwd: path.join(__dirname, '..', '..', 'backend'),
-    stdio: 'inherit',
-  })
-  backendProcess.on('error', (err) => {
-    console.error('[Backend] Failed to start:', err.message)
-  })
-  backendProcess.on('exit', (code) => {
-    console.log(`[Backend] Exited with code ${code}`)
-  })
+    const backendPath = path.join(__dirname, "..", "..", "backend", "main.py");
+    backendProcess = spawn("python", [backendPath], {
+        cwd: path.join(__dirname, "..", "..", "backend"),
+        stdio: "inherit",
+    });
+    backendProcess.on("error", (err) => {
+        console.error("[Backend] Failed to start:", err.message);
+    });
+    backendProcess.on("exit", (code) => {
+        console.log(`[Backend] Exited with code ${code}`);
+    });
 }
 
 // ── Poll /health until backend is ready ──────────────────────────────────────
 function waitForBackend(onReady) {
-  const check = () => {
-    http.get(`${API_BASE}/health`, (res) => {
-      if (res.statusCode === 200) {
-        onReady()
-      } else {
-        setTimeout(check, 500)
-      }
-    }).on('error', () => setTimeout(check, 500))
-  }
-  check()
+    const check = () => {
+        http.get(`${API_BASE}/health`, (res) => {
+            if (res.statusCode === 200) {
+                onReady();
+            } else {
+                setTimeout(check, 500);
+            }
+        }).on("error", () => setTimeout(check, 500));
+    };
+    check();
 }
 
 // ── Create the main browser window ───────────────────────────────────────────
 function createWindow() {
-  mainWindow = new BrowserWindow({
-    width: 1400,
-    height: 900,
-    title: 'Emergency Intelligence Hub',
-    webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
-      contextIsolation: true,      // required for contextBridge
-      nodeIntegration: false,      // never expose Node to renderer
-      sandbox: false,
-    },
-  })
-  mainWindow.loadFile(path.join(__dirname, '..', 'index.html'))
-  mainWindow.on('closed', () => { mainWindow = null })
+    mainWindow = new BrowserWindow({
+        width: 1400,
+        height: 900,
+        title: "Emergency Intelligence Hub",
+        webPreferences: {
+            preload: path.join(__dirname, "preload.js"),
+            contextIsolation: true, // required for contextBridge
+            nodeIntegration: false, // never expose Node to renderer
+            sandbox: false,
+        },
+    });
+    mainWindow.loadFile(path.join(__dirname, "..", "index.html"));
+    mainWindow.on("closed", () => {
+        mainWindow = null;
+    });
 }
 
 // ── App lifecycle ─────────────────────────────────────────────────────────────
 app.whenReady().then(() => {
-  startBackend()
-  waitForBackend(() => {
-    createWindow()
-  })
-})
+    startBackend();
+    waitForBackend(() => {
+        createWindow();
+    });
+});
 
-app.on('window-all-closed', () => {
-  if (backendProcess) backendProcess.kill()
-  app.quit()
-})
+app.on("window-all-closed", () => {
+    if (backendProcess) backendProcess.kill();
+    app.quit();
+});
 
-app.on('before-quit', () => {
-  if (backendProcess) backendProcess.kill()
-})
+app.on("before-quit", () => {
+    if (backendProcess) backendProcess.kill();
+});

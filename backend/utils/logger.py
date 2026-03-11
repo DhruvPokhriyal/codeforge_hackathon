@@ -32,11 +32,11 @@ def log_handoff(
 ) -> None:
     """Append a single handoff event to logs/handoffs.jsonl."""
     entry = {
-        "timestamp":  datetime.now().strftime("%H:%M:%S.%f")[:-3],
+        "timestamp": datetime.now().strftime("%H:%M:%S.%f")[:-3],
         "from_agent": from_agent.upper(),
-        "to_agent":   to_agent.upper(),
-        "reason":     reason,
-        "payload":    payload,
+        "to_agent": to_agent.upper(),
+        "reason": reason,
+        "payload": payload,
     }
     with _LOG_FILE.open("a", encoding="utf-8") as f:
         f.write(json.dumps(entry) + "\n")

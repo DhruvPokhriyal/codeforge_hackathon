@@ -17,7 +17,7 @@ import torchaudio
 from pathlib import Path
 from denoiser.pretrained import master64
 
-NOISY_INPUT_DIR   = Path(__file__).parent / "noisy_input"
+NOISY_INPUT_DIR = Path(__file__).parent / "noisy_input"
 DENOISED_OUTPUT_DIR = Path(__file__).parent / "denoised_output"
 SUPPORTED_FORMATS = {".wav", ".mp3", ".flac", ".ogg", ".m4a"}
 
@@ -32,7 +32,7 @@ def load_audio(file_path: Path) -> torch.Tensor:
 
 
 def denoise_all():
-    input_dir  = NOISY_INPUT_DIR
+    input_dir = NOISY_INPUT_DIR
     output_dir = DENOISED_OUTPUT_DIR
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -53,8 +53,8 @@ def denoise_all():
     for file_path in sorted(audio_files):
         try:
             wav = load_audio(file_path)
-            duration    = wav.shape[-1] / 16000
-            wav_input   = wav.unsqueeze(0)
+            duration = wav.shape[-1] / 16000
+            wav_input = wav.unsqueeze(0)
 
             t0 = time.perf_counter()
             with torch.no_grad():

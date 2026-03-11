@@ -25,8 +25,19 @@ _FUZZY_MIN_SCORE = 55
 class InventoryManager:
     def __init__(self, csv_path: str = str(INVENTORY_CSV)):
         self._path = csv_path
-        self.df = pd.read_csv(csv_path) if INVENTORY_CSV.exists() else pd.DataFrame(
-            columns=["Item", "Available", "Reserved", "Total", "Bin Location", "Category"]
+        self.df = (
+            pd.read_csv(csv_path)
+            if INVENTORY_CSV.exists()
+            else pd.DataFrame(
+                columns=[
+                    "Item",
+                    "Available",
+                    "Reserved",
+                    "Total",
+                    "Bin Location",
+                    "Category",
+                ]
+            )
         )
 
     # ── Public API ────────────────────────────────────────────────────────────
@@ -42,7 +53,7 @@ class InventoryManager:
         if self.df.at[idx, "Available"] < quantity:
             return False
         self.df.at[idx, "Available"] -= quantity
-        self.df.at[idx, "Reserved"]  += quantity
+        self.df.at[idx, "Reserved"] += quantity
         self._save()
         return True
 
@@ -52,19 +63,22 @@ class InventoryManager:
         if idx is None:
             return
         self.df.at[idx, "Available"] += quantity
-        self.df.at[idx, "Reserved"]   = max(0, self.df.at[idx, "Reserved"] - quantity)
+        self.df.at[idx, "Reserved"] = max(0, self.df.at[idx, "Reserved"] - quantity)
         self._save()
 
     def daily_refill(self) -> None:
         """Full overnight reset — Available = Total, Reserved = 0."""
         self.df["Available"] = self.df["Total"]
-        self.df["Reserved"]  = 0
+        self.df["Reserved"] = 0
         self._save()
 
     def partial_refill(self) -> None:
         """Refill only items whose Available / Total ≤ REFILL_THRESHOLD (60%)."""
         for idx, row in self.df.iterrows():
-            if row["Total"] > 0 and (row["Available"] / row["Total"]) <= REFILL_THRESHOLD:
+            if (
+                row["Total"] > 0
+                and (row["Available"] / row["Total"]) <= REFILL_THRESHOLD
+            ):
                 self.df.at[idx, "Available"] = row["Total"]
         self._save()
 

@@ -15,7 +15,6 @@ router = APIRouter()
 async def get_volunteers():
     return {
         "volunteers": [
-            {"volunteer_id": vid, **info}
-            for vid, info in VOLUNTEERS.items()
+            {"volunteer_id": vid, **info} for vid, info in VOLUNTEERS.items()
         ]
     }

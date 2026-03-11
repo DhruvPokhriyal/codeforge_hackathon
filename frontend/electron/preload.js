@@ -14,53 +14,63 @@
 //   window.api.getVolunteers()                        → GET /volunteers
 //   window.api.getInventory()                         → GET /inventory
 
-const { contextBridge } = require('electron')
-const http = require('http')
+const { contextBridge } = require("electron");
+const http = require("http");
 
-const API_BASE = 'http://127.0.0.1:8000'
+const API_BASE = "http://127.0.0.1:8000";
 
 /**
  * Generic HTTP helper — returns a Promise<object>.
  * Only connects to 127.0.0.1 (offline-only, no external network calls).
  */
 function apiCall(method, path, body = null) {
-  return new Promise((resolve, reject) => {
-    const payload = body ? JSON.stringify(body) : null
-    const options = {
-      hostname: '127.0.0.1',
-      port: 8000,
-      path,
-      method,
-      headers: {
-        'Content-Type': 'application/json',
-        ...(payload ? { 'Content-Length': Buffer.byteLength(payload) } : {}),
-      },
-    }
-    const req = http.request(options, (res) => {
-      let data = ''
-      res.on('data', (chunk) => { data += chunk })
-      res.on('end', () => {
-        try { resolve(JSON.parse(data)) }
-        catch (e) { reject(new Error('Invalid JSON response')) }
-      })
-    })
-    req.on('error', reject)
-    if (payload) req.write(payload)
-    req.end()
-  })
+    return new Promise((resolve, reject) => {
+        const payload = body ? JSON.stringify(body) : null;
+        const options = {
+            hostname: "127.0.0.1",
+            port: 8000,
+            path,
+            method,
+            headers: {
+                "Content-Type": "application/json",
+                ...(payload
+                    ? { "Content-Length": Buffer.byteLength(payload) }
+                    : {}),
+            },
+        };
+        const req = http.request(options, (res) => {
+            let data = "";
+            res.on("data", (chunk) => {
+                data += chunk;
+            });
+            res.on("end", () => {
+                try {
+                    resolve(JSON.parse(data));
+                } catch (e) {
+                    reject(new Error("Invalid JSON response"));
+                }
+            });
+        });
+        req.on("error", reject);
+        if (payload) req.write(payload);
+        req.end();
+    });
 }
 
-contextBridge.exposeInMainWorld('api', {
-  runPipeline: (audio_b64) =>
-    apiCall('POST', '/pipeline', { audio_b64 }),
+contextBridge.exposeInMainWorld("api", {
+    runPipeline: (audio_b64) => apiCall("POST", "/pipeline", { audio_b64 }),
 
-  approveReport: (request_id, selected_indices, manual_override = null) =>
-    apiCall('POST', '/approve', { request_id, selected_indices, manual_override }),
+    approveReport: (request_id, selected_indices, manual_override = null) =>
+        apiCall("POST", "/approve", {
+            request_id,
+            selected_indices,
+            manual_override,
+        }),
 
-  volunteerReturn: (volunteer_id, returned_items) =>
-    apiCall('POST', '/volunteer/return', { volunteer_id, returned_items }),
+    volunteerReturn: (volunteer_id, returned_items) =>
+        apiCall("POST", "/volunteer/return", { volunteer_id, returned_items }),
 
-  getQueue:      () => apiCall('GET', '/queue'),
-  getVolunteers: () => apiCall('GET', '/volunteers'),
-  getInventory:  () => apiCall('GET', '/inventory'),
-})
+    getQueue: () => apiCall("GET", "/queue"),
+    getVolunteers: () => apiCall("GET", "/volunteers"),
+    getInventory: () => apiCall("GET", "/inventory"),
+});

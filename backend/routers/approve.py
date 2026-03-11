@@ -38,21 +38,27 @@ async def approve_request(body: ApproveRequest):
     # Apply manual override if provided
     if body.manual_override:
         override_sit = {
-            "label":              body.manual_override.get("condition", "Manual Override"),
-            "severity":           "HIGH",
-            "severity_score":     75,
-            "travel_time_min":    10,
+            "label": body.manual_override.get("condition", "Manual Override"),
+            "severity": "HIGH",
+            "severity_score": 75,
+            "travel_time_min": 10,
             "resolution_time_min": 20,
-            "confidence":         1.0,
-            "materials":          [
-                {"item": itm, "quantity": 1, "available": False, "available_qty": 0, "bin": "?"}
+            "confidence": 1.0,
+            "materials": [
+                {
+                    "item": itm,
+                    "quantity": 1,
+                    "available": False,
+                    "available_qty": 0,
+                    "bin": "?",
+                }
                 for itm in body.manual_override.get("items", [])
             ],
-            "instructions":       ["Follow manual override instructions"],
-            "reasoning":          "Manager manual override",
-            "source_chunks":      [],
-            "selected":           True,
-            "heap_key":           75 - 20 - 20,
+            "instructions": ["Follow manual override instructions"],
+            "reasoning": "Manager manual override",
+            "source_chunks": [],
+            "selected": True,
+            "heap_key": 75 - 20 - 20,
         }
         situations.append(override_sit)
 
@@ -68,13 +74,16 @@ async def approve_request(body: ApproveRequest):
         (s["heap_key"] for s in selected),
         default=req["heap_key"],
     )
-    request_store.update(body.request_id, {"heap_key": best_key, "situations": situations})
+    request_store.update(
+        body.request_id, {"heap_key": best_key, "situations": situations}
+    )
 
     # Push to priority heap and dispatch
     priority_queue.push(request_store.get(body.request_id))
     dispatch(priority_queue)
 
     from core.dispatch_engine import VOLUNTEERS
+
     return ApproveResponse(
         request_id=body.request_id,
         queue=[r for r in priority_queue.get_sorted()],
