@@ -47,15 +47,15 @@ def retrieve(query: str, top_k: int = RAG_TOP_K) -> dict:
 
     chunks = [
         {
-            "text":   n.node.get_content(),
-            "score":  n.score,
+            "text": n.node.get_content(),
+            "score": n.score,
             "source": n.node.metadata.get("file_name", "unknown"),
-            "page":   n.node.metadata.get("page_label", "?"),
+            "page": n.node.metadata.get("page_label", "?"),
         }
         for n in nodes
     ]
 
     top_score = chunks[0]["score"] if chunks else 0.0
-    is_vague  = top_score < CONFIDENCE_THRESHOLD
+    is_vague = top_score < CONFIDENCE_THRESHOLD
 
     return {"chunks": chunks, "is_vague": is_vague, "top_score": top_score}

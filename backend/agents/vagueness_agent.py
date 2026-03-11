@@ -43,9 +43,9 @@ def resolve_vagueness(transcript: str, llm: Llama) -> dict:
     except Exception:
         return {
             "CRITICAL": ["cardiac arrest"],
-            "HIGH":     ["fracture"],
-            "MEDIUM":   ["fever"],
-            "LOW":      ["dehydration"],
+            "HIGH": ["fracture"],
+            "MEDIUM": ["fever"],
+            "LOW": ["dehydration"],
         }
 
 
