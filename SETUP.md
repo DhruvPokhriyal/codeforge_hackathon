@@ -1,8 +1,8 @@
 # ⚙️ Setup Guide
 ## Libraries, Models & Installation — Offline Emergency Intelligence Hub
 
-> ✅ After completing this guide, your system will run **100% offline**.
-> Internet is only needed during this one-time setup.
+> ✅ After completing this guide your system runs **100% offline**.
+> Internet only needed during this one-time setup.
 
 ---
 
@@ -10,10 +10,11 @@
 
 | Spec | Minimum | Recommended |
 |------|---------|-------------|
-| RAM | 6 GB | 8 GB+ |
+| RAM | 6 GB | 10 GB+ |
 | CPU Cores | 4 | 8+ |
-| Disk Space | 6 GB free | 10 GB free |
+| Disk Space | 8 GB free | 12 GB free |
 | Python | 3.9+ | 3.11 |
+| Node.js | 18+ | 20 LTS |
 | OS | Windows 10 / Ubuntu 20.04 / macOS 11 | Any |
 | Internet | Only during setup | ❌ Not needed at runtime |
 
@@ -21,134 +22,159 @@
 
 ## Step 0 — Prerequisites
 
-### Install Python 3.11
+### Python 3.11
 ```bash
-# Check your version first
-python --version
+python --version   # check first
 
 # Ubuntu/Debian
 sudo apt update && sudo apt install python3.11 python3.11-venv python3-pip -y
 
-# macOS (via Homebrew)
+# macOS
 brew install python@3.11
 
-# Windows — download from https://python.org/downloads
+# Windows → https://python.org/downloads
 ```
 
-### Install system audio libraries (Linux only)
+### Node.js 20 LTS
 ```bash
+# Ubuntu (via nvm)
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+nvm install 20 && nvm use 20
+
+# macOS
+brew install node@20
+
+# Windows → https://nodejs.org/en/download
+```
+
+### System audio + ffmpeg
+```bash
+# Ubuntu
 sudo apt install portaudio19-dev ffmpeg -y
-```
 
-### Install ffmpeg (macOS)
-```bash
+# macOS
 brew install ffmpeg
-```
 
-### Install ffmpeg (Windows)
-Download from https://ffmpeg.org/download.html and add to PATH.
+# Windows → https://ffmpeg.org/download.html (add bin/ to PATH)
+```
 
 ---
 
-## Step 1 — Create Project & Virtual Environment
+## Step 1 — Clone & Virtual Environment
 
 ```bash
-# Create project folder
-mkdir emergency-hub
+git clone https://github.com/your-team/emergency-hub.git
 cd emergency-hub
 
-# Create virtual environment
 python -m venv venv
-
-# Activate it
-# Linux / macOS:
-source venv/bin/activate
-
-# Windows:
-venv\Scripts\activate
-
-# Confirm activation (should show venv path)
-which python
+source venv/bin/activate       # Windows: venv\Scripts\activate
+which python                   # confirm venv active
 ```
-
-> ⚠️ Always activate the virtual environment before running anything.
 
 ---
 
-## Step 2 — Install All Libraries
+## Step 2 — Install Python Libraries
 
-### Create `requirements.txt`
-
-Paste this into `requirements.txt` in your project root:
+### Full requirements.txt
 
 ```txt
-# Speech to Text
+# Audio denoising
+noisereduce==3.0.2
+denoiser==0.1.5
+torchaudio==2.3.1
+torch==2.3.1
+scipy==1.13.1
+sounddevice==0.4.7
+numpy==1.26.4
+
+# Speech to text
 openai-whisper==20231117
 
-# LLM Inference (CPU)
+# LLM inference (CPU)
 llama-cpp-python==0.2.90
 
-# PDF Vector Search
+# RAG — retrieval + embeddings
 llama-index==0.10.68
 llama-index-embeddings-huggingface==0.2.3
-
-# Embeddings
 sentence-transformers==3.0.1
 
-# Data & Fuzzy Matching
+# Data + fuzzy matching
 pandas==2.2.2
 rapidfuzz==3.9.7
 
-# UI
-gradio==4.42.0
+# Background task scheduling (escalation)
+APScheduler==3.10.4
 
-# Audio Recording
-sounddevice==0.4.7
-scipy==1.13.1
-numpy==1.26.4
+# Backend server
+fastapi==0.111.0
+uvicorn==0.30.1
+
+# Model download utility
+huggingface-hub==0.23.4
 ```
 
-### Install everything
+### Install
 ```bash
 pip install -r requirements.txt
 ```
 
-> ⏱️ This will take 5–15 minutes depending on internet speed. (~1.5GB download)
+> ⏱️ Takes 10–20 minutes. Downloads ~2.5 GB of packages including PyTorch.
 
-### Verify key installs
+### Verify installs
 ```bash
-python -c "import whisper; print('Whisper OK')"
-python -c "from llama_cpp import Llama; print('llama-cpp OK')"
-python -c "import gradio; print('Gradio OK')"
-python -c "from llama_index.core import VectorStoreIndex; print('LlamaIndex OK')"
+python -c "import whisper; print('whisper ✅')"
+python -c "from llama_cpp import Llama; print('llama-cpp ✅')"
+python -c "import noisereduce; print('noisereduce ✅')"
+python -c "import denoiser; print('facebook denoiser ✅')"
+python -c "import fastapi; print('fastapi ✅')"
+python -c "from llama_index.core import VectorStoreIndex; print('llama-index ✅')"
+python -c "from apscheduler.schedulers.background import BackgroundScheduler; print('APScheduler ✅')"
 ```
 
-All four should print `OK`.
+All seven should print ✅.
 
 ---
 
-## Step 3 — Download AI Models
-
-### Model 1: Whisper Base (Speech-to-Text)
-**Size:** ~140MB | **Auto-downloads** on first use
+## Step 3 — Install Node Dependencies
 
 ```bash
-python -c "import whisper; whisper.load_model('base'); print('Whisper base downloaded!')"
+npm install
 ```
 
-The model saves to `~/.cache/whisper/` automatically.
+Minimum `package.json`:
+```json
+{
+  "name": "emergency-hub",
+  "version": "1.0.0",
+  "main": "electron/main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder"
+  },
+  "devDependencies": {
+    "electron": "^31.0.0",
+    "electron-builder": "^24.0.0"
+  }
+}
+```
 
 ---
 
-### Model 2: LLaMA 3.2 3B GGUF (Triage LLM)
-**Size:** ~2.0GB | **Manual download required**
+## Step 4 — Download AI Models
+
+### Model 1: Whisper Base (auto on first use)
+**Size:** 140 MB
 
 ```bash
-# Create models directory
+python -c "import whisper; whisper.load_model('base'); print('Whisper base ✅')"
+```
+
+### Model 2: LLaMA 3.2 3B Q4_K_M GGUF (manual)
+**Size:** ~2.0 GB
+
+```bash
 mkdir -p models
 
-# Option A — Download via huggingface-hub (recommended)
-pip install huggingface-hub
 python -c "
 from huggingface_hub import hf_hub_download
 hf_hub_download(
@@ -156,211 +182,179 @@ hf_hub_download(
     filename='Llama-3.2-3B-Instruct-Q4_K_M.gguf',
     local_dir='./models'
 )
-print('LLaMA downloaded!')
+print('LLaMA ✅')
 "
 ```
 
+**Alternative:**
 ```bash
-# Option B — Direct wget (Linux/macOS)
-wget -P ./models "https://huggingface.co/bartowski/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct-Q4_K_M.gguf"
+wget -P ./models \
+  "https://huggingface.co/bartowski/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct-Q4_K_M.gguf"
 ```
 
-For Windows — open this URL in browser and save to `./models/`:
-```
-https://huggingface.co/bartowski/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct-Q4_K_M.gguf
-```
-
-**Verify:**
-```bash
-ls -lh models/
-# Should show: Llama-3.2-3B-Instruct-Q4_K_M.gguf  ~2.0G
-```
-
----
-
-### Model 3: all-MiniLM-L6-v2 (PDF Embeddings)
-**Size:** ~80MB | **Auto-downloads** on first use
+### Model 3: all-MiniLM-L6-v2 (auto on first use)
+**Size:** 80 MB
 
 ```bash
 python -c "
 from sentence_transformers import SentenceTransformer
 SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
-print('MiniLM downloaded!')
+print('MiniLM ✅')
 "
 ```
 
-Saves to `~/.cache/huggingface/` automatically.
-
----
-
-## Step 4 — Prepare Data Files
-
-### Create folder structure
-```bash
-mkdir -p data/protocols
-mkdir -p temp
-mkdir -p utils
-mkdir -p agents
-```
-
-### Create `data/inventory.csv`
-```bash
-cat > data/inventory.csv << 'EOF'
-Item,Quantity,Bin Location,Category
-Leg Splint,4,A-1,Medical
-Bandages,50,A-2,Medical
-Tourniquets,10,A-1,Medical
-Neck Brace,2,A-3,Medical
-First Aid Kit,8,A-4,Medical
-CPR Mask,5,A-4,Medical
-Water Bottles,200,B-3,Resources
-Energy Bars,150,B-1,Resources
-Baby Formula,20,B-2,Resources
-Oral Rehydration Salts,40,B-4,Resources
-Blankets,30,C-1,Comfort
-Sleeping Bags,15,C-2,Comfort
-Flashlights,15,D-2,Equipment
-Batteries AA,100,D-1,Equipment
-Whistle,20,D-3,Equipment
-EOF
-```
-
-### Add First Aid PDFs to `data/protocols/`
-Download any of these free, public-domain resources:
-
-| Resource | Link |
-|----------|------|
-| WHO Basic Emergency Care | https://www.who.int/publications/i/item/basic-emergency-care |
-| Red Cross First Aid Manual | Search "Red Cross First Aid PDF free download" |
-| FEMA Disaster Preparedness | https://www.ready.gov/sites/default/files/2020-03/ready_are-you-ready-guide.pdf |
-
-```bash
-# Example: Download FEMA guide
-wget -P data/protocols/ "https://www.ready.gov/sites/default/files/2020-03/ready_are-you-ready-guide.pdf"
-```
-
-> You need **at least one PDF** in `data/protocols/` for the logistics agent to work.
-
----
-
-## Step 5 — Create `__init__.py` Files
-
-```bash
-touch agents/__init__.py
-touch utils/__init__.py
-```
-
----
-
-## Step 6 — Verify Full Offline Setup
-
-**Disable Wi-Fi**, then run this test:
+### Model 4: Facebook Denoiser dns64 (auto on first use)
+**Size:** ~90 MB
 
 ```bash
 python -c "
-import whisper
-from llama_cpp import Llama
-from llama_index.core import VectorStoreIndex, SimpleDirectoryReader
-from llama_index.embeddings.huggingface import HuggingFaceEmbedding
-import pandas as pd
-from rapidfuzz import fuzz
-import gradio as gr
-
-print('✅ All imports successful')
-print('✅ System is ready for offline use')
+from denoiser import pretrained
+pretrained.dns64()
+print('Facebook Denoiser ✅')
 "
 ```
 
 ---
 
-## Step 7 — First Run
+## Step 5 — Prepare Data Files
 
+### Create directories
 ```bash
-python main.py
+mkdir -p data/protocols temp vector_store logs
+touch temp/.gitkeep logs/.gitkeep
+touch backend/agents/__init__.py backend/core/__init__.py
+touch backend/routers/__init__.py backend/utils/__init__.py
 ```
 
-On first run, LlamaIndex will build the vector index from your PDFs.
-This takes ~30–60 seconds. Subsequent runs are instant (index is cached).
+### inventory.csv
+```bash
+cat > data/inventory.csv << 'EOF'
+Item,Available,Reserved,Total,Bin Location,Category
+Leg Splint,4,0,4,A-1,Medical
+AED,2,0,2,C-3,Medical
+CPR Mask,5,0,5,A-4,Medical
+Bandages,50,0,50,A-2,Medical
+Tourniquets,10,0,10,A-1,Medical
+Neck Brace,2,0,2,A-3,Medical
+First Aid Kit,8,0,8,A-4,Medical
+Oxygen Tank,1,0,1,B-1,Medical
+Water Bottles,200,0,200,B-3,Resources
+Energy Bars,150,0,150,B-1,Resources
+Baby Formula,20,0,20,B-2,Resources
+ORS Sachets,40,0,40,B-4,Resources
+Blankets,30,0,30,C-1,Comfort
+Flashlights,15,0,15,D-2,Equipment
+Batteries AA,100,0,100,D-1,Equipment
+EOF
+```
 
-Open browser at: `http://localhost:7860`
+### Add PDFs to `data/protocols/`
+
+At least 1 PDF required for RAG to function.
+
+| Source | Download Link |
+|--------|--------------|
+| WHO Basic Emergency Care | https://www.who.int/publications/i/item/basic-emergency-care |
+| FEMA Disaster Guide | https://www.ready.gov/sites/default/files/2020-03/ready_are-you-ready-guide.pdf |
+
+```bash
+wget -P data/protocols/ \
+  "https://www.ready.gov/sites/default/files/2020-03/ready_are-you-ready-guide.pdf"
+```
+
+---
+
+## Step 6 — First Run
+
+```bash
+# Activate venv
+source venv/bin/activate
+
+# Launch (Electron auto-starts FastAPI)
+npm start
+```
+
+On **first run** LlamaIndex builds the vector index from your PDFs (~30–60s). Subsequent runs are instant (index cached in `vector_store/`).
+
+API explorer: `http://127.0.0.1:8000/docs`
 
 ---
 
 ## Complete Library Reference
 
-### Core AI Libraries
-
-| Library | Version | Purpose | Size |
-|---------|---------|---------|------|
-| `openai-whisper` | 20231117 | Speech-to-text (Agent 1) | 140MB model |
-| `llama-cpp-python` | 0.2.90 | Run GGUF LLMs on CPU (Agent 2) | — |
-| `llama-index` | 0.10.68 | PDF vector search orchestration (Agent 3) | — |
-| `llama-index-embeddings-huggingface` | 0.2.3 | HuggingFace embedding bridge | — |
-| `sentence-transformers` | 3.0.1 | MiniLM embedding model (Agent 3) | 80MB model |
-
-### Data & Matching
+### Python — AI / ML
 
 | Library | Version | Purpose |
 |---------|---------|---------|
-| `pandas` | 2.2.2 | Read and query `inventory.csv` |
-| `rapidfuzz` | 3.9.7 | Fuzzy string matching for inventory lookup |
-| `numpy` | 1.26.4 | Numerical operations (whisper dependency) |
+| `openai-whisper` | 20231117 | Speech-to-text (CPU, fp16=False) |
+| `noisereduce` | 3.0.2 | Stationary audio denoising |
+| `denoiser` | 0.1.5 | Facebook dns64 neural denoiser |
+| `torch` + `torchaudio` | 2.3.1 | Facebook denoiser dependency |
+| `llama-cpp-python` | 0.2.90 | GGUF LLM on CPU (vagueness + triage) |
+| `llama-index` | 0.10.68 | RAG framework (retrieval + vector store) |
+| `llama-index-embeddings-huggingface` | 0.2.3 | HuggingFace embedding integration |
+| `sentence-transformers` | 3.0.1 | all-MiniLM-L6-v2 embedding model |
 
-### UI & Audio
+### Python — Data + Backend
 
 | Library | Version | Purpose |
 |---------|---------|---------|
-| `gradio` | 4.42.0 | Web-based dashboard UI |
-| `sounddevice` | 0.4.7 | Live microphone recording |
-| `scipy` | 1.13.1 | Save `.wav` files from mic input |
+| `pandas` | 2.2.2 | Inventory CSV read/write |
+| `rapidfuzz` | 3.9.7 | Fuzzy item name matching |
+| `APScheduler` | 3.10.4 | Background escalation scheduler |
+| `fastapi` | 0.111.0 | REST API |
+| `uvicorn` | 0.30.1 | ASGI server |
+| `scipy` | 1.13.1 | WAV file I/O |
+| `numpy` | 1.26.4 | Audio array ops |
 
-### Models Summary
+### Node
 
-| Model | File/Cache Location | Size | Download Method |
-|-------|---------------------|------|-----------------|
-| Whisper Base | `~/.cache/whisper/base.pt` | 140MB | Auto on first run |
-| LLaMA 3.2 3B Q4_K_M | `./models/Llama-3.2-3B-Instruct-Q4_K_M.gguf` | ~2.0GB | Manual (Step 3) |
-| all-MiniLM-L6-v2 | `~/.cache/huggingface/...` | 80MB | Auto on first run |
+| Package | Version | Purpose |
+|---------|---------|---------|
+| `electron` | 31.x | Desktop shell |
+| `electron-builder` | 24.x | Cross-platform packaging |
 
-**Total download: ~2.3GB**
-**Total RAM at runtime: ~4–5GB**
+### Models
+
+| Model | Location | Size | How Downloaded |
+|-------|----------|------|----------------|
+| `whisper-base` | `~/.cache/whisper/` | 140 MB | Auto |
+| `Llama-3.2-3B-Instruct-Q4_K_M.gguf` | `./models/` | ~2.0 GB | Manual (Step 4) |
+| `all-MiniLM-L6-v2` | `~/.cache/huggingface/` | 80 MB | Auto |
+| `facebook dns64` | `~/.cache/torch/hub/` | ~90 MB | Auto |
+
+**Total download: ~2.5 GB · RAM at runtime: ~4–5 GB**
 
 ---
 
 ## Troubleshooting
 
-### `llama-cpp-python` install fails
+### `llama-cpp-python` build fails
 ```bash
-# Install with no binary (build from source)
 CMAKE_ARGS="-DLLAMA_BLAS=ON -DLLAMA_BLAS_VENDOR=OpenBLAS" \
 pip install llama-cpp-python --no-cache-dir
 ```
 
-### `sounddevice` PortAudio error (Linux)
+### `torch` install too large / slow
 ```bash
-sudo apt install portaudio19-dev -y
-pip install sounddevice --force-reinstall
-```
-
-### Whisper ffmpeg error
-```bash
-# Ubuntu
-sudo apt install ffmpeg -y
-# macOS
-brew install ffmpeg
+pip install torch==2.3.1 --index-url https://download.pytorch.org/whl/cpu
 ```
 
 ### LlamaIndex rebuild vector store
 ```bash
-# Delete and rebuild
 rm -rf vector_store/
-python -c "from agents.logistics_agent import build_protocol_index; build_protocol_index()"
+python -c "from backend.agents.retrieval_agent import build_index; build_index()"
 ```
 
-### Out of memory during LLM inference
-Edit `triage_agent.py` and reduce context:
+### APScheduler conflict at startup
+```bash
+pip install APScheduler==3.10.4 --force-reinstall
+```
+
+### Out of RAM during LLM inference
 ```python
-llm = Llama(model_path="...", n_ctx=1024, n_threads=2)  # reduce ctx and threads
+# triage_agent.py — reduce context
+llm = Llama(model_path="...", n_ctx=1024, n_threads=2, n_gpu_layers=0)
 ```
 
 ---
@@ -368,18 +362,9 @@ llm = Llama(model_path="...", n_ctx=1024, n_threads=2)  # reduce ctx and threads
 ## Quick Reference — Daily Use
 
 ```bash
-# 1. Navigate to project
 cd emergency-hub
-
-# 2. Activate virtual environment
-source venv/bin/activate        # Linux/macOS
-venv\Scripts\activate           # Windows
-
-# 3. Run
-python main.py
-
-# 4. Open in browser
-# http://localhost:7860
-
-# 5. Disable Wi-Fi — everything still works ✅
+source venv/bin/activate     # Linux/macOS
+venv\Scripts\activate        # Windows
+npm start                    # launches Electron + FastAPI together
+# Disable Wi-Fi → still works fully ✅
 ```

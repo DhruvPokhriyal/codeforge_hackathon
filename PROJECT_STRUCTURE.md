@@ -1,163 +1,250 @@
 # 📁 Project Structure
-## Offline Emergency Intelligence Hub
+## Offline Emergency Intelligence Hub — Electron + FastAPI
+
+---
+
+## Full Folder Tree
 
 ```
 emergency-hub/
 │
-├── main.py                        # Entry point — launches Gradio UI & initializes all agents
-├── main_pipeline.py               # Orchestrator — wires all 3 agents + handoff logging
-├── requirements.txt               # All Python dependencies
-├── README.md                      # Project overview
-├── IMPLEMENTATION.md              # Technical deep-dive
+├── package.json                         # Electron config + npm scripts
+├── requirements.txt                     # All Python dependencies
+├── .gitignore
 │
-├── agents/                        # Each AI agent lives here as its own module
-│   ├── __init__.py
-│   ├── intake_agent.py            # Agent 1: Whisper speech-to-text transcription
-│   ├── triage_agent.py            # Agent 2: LLaMA severity classification → JSON
-│   └── logistics_agent.py        # Agent 3: CSV inventory + PDF protocol retrieval
+├── electron/
+│   ├── main.js                          # Electron main process
+│   │                                    #   · spawn('python', ['backend/main.py'])
+│   │                                    #   · poll GET /health until 200 OK
+│   │                                    #   · createBrowserWindow()
+│   │                                    #   · kill backend on app.quit
+│   └── preload.js                       # contextBridge IPC layer
+│                                        #   exposes: runPipeline, approveReport,
+│                                        #   volunteerReturn, getQueue, getVolunteers,
+│                                        #   getInventory
 │
-├── models/                        # Local model files (downloaded once, used offline)
-│   ├── .gitkeep                   # Keep folder in git, exclude large files via .gitignore
-│   └── llama-3.2-3b-instruct.Q4_K_M.gguf   # ~2GB — download manually (see SETUP.md)
+├── frontend/
+│   ├── index.html                       # App shell — 3-panel dashboard layout
+│   ├── app.js                           # All UI logic:
+│   │                                    #   · audio upload + base64 encoding
+│   │                                    #   · POST /pipeline → render HITL report
+│   │                                    #   · HITL approval: situation card selection,
+│   │                                    #     greyed-out items, manual override
+│   │                                    #   · POST /approve → dispatch
+│   │                                    #   · Live countdown timers per volunteer
+│   │                                    #   · "Back at Base" button + return popup
+│   │                                    #   · POST /volunteer/return
+│   │                                    #   · 3s polling: GET /queue, /volunteers, /inventory
+│   └── styles.css                       # High-contrast dark emergency theme
+│                                        #   CSS vars: --critical, --high, --medium, --low
+│                                        #   .greyed-out for unavailable items
+│                                        #   .timer.overdue for negative countdown
+│
+├── backend/
+│   │
+│   ├── main.py                          # FastAPI app init + Uvicorn entry point
+│   │                                    #   · Binds 127.0.0.1:8000 only
+│   │                                    #   · Registers all routers
+│   │                                    #   · On startup: loads all models,
+│   │                                    #     builds LlamaIndex, starts APScheduler
+│   │
+│   ├── routers/
+│   │   ├── __init__.py
+│   │   ├── pipeline.py                  # POST /pipeline
+│   │   │                                #   Steps: denoise → STT → retrieve →
+│   │   │                                #   (vagueness?) → rag_triage → inventory check
+│   │   │                                #   Returns: multi-situation report JSON
+│   │   ├── approve.py                   # POST /approve
+│   │   │                                #   Receives selected situation indices
+│   │   │                                #   Reserves inventory items
+│   │   │                                #   Pushes request to heap
+│   │   │                                #   Triggers dispatch
+│   │   ├── queue.py                     # GET /queue — heap-sorted request list
+│   │   ├── volunteers.py                # GET /volunteers — all statuses + timers
+│   │   ├── volunteer_return.py          # POST /volunteer/return
+│   │   │                                #   Receives returned items checklist
+│   │   │                                #   Restores items to inventory
+│   │   │                                #   Marks volunteer AVAILABLE
+│   │   │                                #   Re-runs dispatch
+│   │   └── inventory.py                 # GET /inventory · PUT /inventory/refill
+│   │
+│   ├── agents/
+│   │   ├── __init__.py
+│   │   ├── denoiser.py                  # STEP 2: Audio denoising
+│   │   │                                #   · Option A: noisereduce (stationary, 85%)
+│   │   │                                #   · Option B: Facebook Denoiser (dns64)
+│   │   │                                #   · Config flag: DENOISER = "noisereduce"|"facebook"
+│   │   ├── intake_agent.py              # STEP 3: Whisper base, fp16=False (CPU only)
+│   │   ├── retrieval_agent.py           # STEP 4: LlamaIndex retrieval
+│   │   │                                #   · Returns top-k chunks + confidence scores
+│   │   │                                #   · Sets is_vague flag if top_score < 0.8
+│   │   ├── vagueness_agent.py           # STEP 4b: LLM hypothesis expansion
+│   │   │                                #   · Generates 2-3 conditions per severity level
+│   │   │                                #   · Retries retrieval for each hypothesis
+│   │   │                                #   · Merges and deduplicates chunks
+│   │   ├── rag_triage_agent.py          # STEP 5: RAG LLM + Triage
+│   │   │                                #   · Reads transcript + retrieved chunks
+│   │   │                                #   · Outputs multi-situation JSON array
+│   │   │                                #   · Each situation: label, severity, score,
+│   │   │                                #     travel_time, resolution_time, materials,
+│   │   │                                #     instructions, reasoning, source_chunks
+│   │   │                                #   · Computes heap_key per situation
+│   │   └── logistics_agent.py           # STEP 6: Inventory availability annotation
+│   │                                    #   · fuzzy-matches each material to CSV
+│   │                                    #   · annotates available/available_qty/bin
+│   │
+│   ├── core/
+│   │   ├── __init__.py
+│   │   ├── priority_queue.py            # Max-heap
+│   │   │                                #   · Key: (-heap_key, timestamp, req_id)
+│   │   │                                #   · push(), peek_top_pending(), get_sorted()
+│   │   │                                #   · update_key() — rebuilds heap (no decrease-key)
+│   │   │                                #   · Singleton shared across all routers
+│   │   ├── dispatch_engine.py           # Volunteer assignment scheduler
+│   │   │                                #   · VOLUNTEERS dict: V-01 to V-06
+│   │   │                                #   · dispatch(): assign free vol to top PENDING
+│   │   │                                #   · volunteer_return(): restore items, re-dispatch
+│   │   │                                #   · Timer expected_return = travel + resolution
+│   │   │                                #   · Timer freezes at 0 — no auto-reassign
+│   │   ├── escalation_scheduler.py      # APScheduler background job
+│   │   │                                #   · Runs every 60 seconds
+│   │   │                                #   · Checks all PENDING tasks
+│   │   │                                #   · Applies exponential urgency boost per schedule
+│   │   │                                #   · Adds buffer = f(travel, resolution) at each step
+│   │   │                                #   · Calls queue.update_key()
+│   │   └── request_store.py             # In-memory request registry
+│   │                                    #   · request_id → full request dict
+│   │                                    #   · filter_by_status(status)
+│   │
+│   └── utils/
+│       ├── __init__.py
+│       ├── logger.py                    # Structured JSON handoff logger
+│       │                                #   · log_handoff(from, to, reason, payload)
+│       │                                #   · Appends to logs/handoffs.jsonl
+│       ├── audio_utils.py               # save_base64_wav() · cleanup_temp()
+│       └── inventory_manager.py         # InventoryManager class
+│                                        #   · reserve(item, qty) — decrements Available
+│                                        #   · restore(item, qty) — increments Available
+│                                        #   · daily_refill() — full reset at midnight
+│                                        #   · partial_refill() — refill items ≤ 60%
 │
 ├── data/
-│   ├── inventory.csv              # Shelter resource manifest (editable by volunteers)
-│   └── protocols/                 # Offline first-aid PDF knowledge base
-│       ├── first_aid_manual.pdf   # St. John Ambulance or equivalent (public domain)
-│       ├── trauma_guide.pdf       # Optional: trauma-specific protocols
-│       └── disaster_response.pdf  # Optional: disaster-specific guidelines
+│   ├── inventory.csv                    # Item | Available | Reserved | Total | Bin Location | Category
+│   └── protocols/                       # Offline PDF knowledge base
+│       ├── first_aid_manual.pdf         # Primary reference (St. John / WHO)
+│       ├── trauma_guide.pdf
+│       └── disaster_response.pdf
 │
-├── utils/
-│   ├── __init__.py
-│   ├── logger.py                  # Agent handoff log formatter (JSON output)
-│   └── audio_utils.py            # Microphone recording helpers (sounddevice wrapper)
+├── models/
+│   └── Llama-3.2-3B-Instruct-Q4_K_M.gguf   # ~2GB — downloaded during setup
 │
-├── vector_store/                  # Auto-generated at first run by LlamaIndex
-│   └── (index files)             # DO NOT manually edit — rebuilt from /data/protocols/
+├── vector_store/                        # Auto-built by LlamaIndex on first run
+│   └── (index files)                    # Rebuilt from /data/protocols/ if deleted
 │
-├── temp/                          # Temporary audio recordings (auto-cleared each run)
-│   └── .gitkeep
+├── logs/
+│   └── handoffs.jsonl                   # Append-only structured agent handoff log
 │
-└── .gitignore
+├── temp/                                # REQ-XXX_raw.wav · REQ-XXX_clean.wav
+│   └── .gitkeep                         # Cleared each session
+│
+└── scripts/
+    └── download_models.py               # One-command model download script
 ```
 
 ---
 
-## File-by-File Responsibility
+## Data Flow Between Files
 
-### Root Level
-
-| File | Role |
-|------|------|
-| `main.py` | Starts the Gradio UI, loads all models at startup, defines UI layout |
-| `main_pipeline.py` | Calls agents in order: Intake → Triage → Logistics, logs every handoff |
-| `requirements.txt` | Single source of truth for all dependencies |
-
----
-
-### `/agents/`
-
-| File | Agent | Model Used | Output |
-|------|-------|------------|--------|
-| `intake_agent.py` | Agent 1: INTAKE | `whisper-base` | Clean text transcript |
-| `triage_agent.py` | Agent 2: TRIAGE | `llama-3.2-3b GGUF` | JSON: severity, type, key_need |
-| `logistics_agent.py` | Agent 3: LOGISTICS | `all-MiniLM-L6-v2` + pandas | Inventory dict + protocol text |
-
----
-
-### `/data/`
-
-| File | Format | Purpose |
-|------|--------|---------|
-| `inventory.csv` | CSV | Master list of all shelter supplies with bin locations |
-| `protocols/*.pdf` | PDF | Offline first-aid and disaster response manuals |
-
----
-
-### `/utils/`
-
-| File | Purpose |
-|------|---------|
-| `logger.py` | Logs every agent handoff as timestamped JSON entries |
-| `audio_utils.py` | Wraps `sounddevice` for live mic recording, saves to `/temp/` |
-
----
-
-### `/vector_store/`
-Auto-generated by LlamaIndex the first time `logistics_agent.py` runs.
-Stores the vector embeddings of all PDFs in `/data/protocols/`.
-**Do not commit this to git** — add to `.gitignore`. It rebuilds automatically.
-
----
-
-## Data Flow Diagram
-
+### Inbound Request (Audio → HITL Report)
 ```
-[User]
-  │
-  ├─ Voice Input (mic / .wav)
-  │       ↓
-  │   intake_agent.py
-  │   (whisper-base)
-  │       ↓ transcript (string)
-  │
-  ├─ Text Input (fallback)
-  │       ↓
-  │   [skips intake_agent]
-  │       ↓
-  │
-  └──────────────────────────────────────────────────────┐
-                                                          ↓
-                                               triage_agent.py
-                                               (llama-3.2-3b GGUF)
-                                                          ↓
-                                               {severity, emergency_type,
-                                                key_need, summary, reasoning}
-                                                          ↓
-                                            logistics_agent.py
-                                           ┌──────────────┴──────────────┐
-                                           ↓                             ↓
-                                   check_inventory()             get_protocol()
-                                   (pandas + rapidfuzz)      (LlamaIndex + MiniLM)
-                                   inventory.csv               protocols/*.pdf
-                                           ↓                             ↓
-                                   {item, qty, bin}        "Step 1: ... Step 2: ..."
-                                           └──────────────┬──────────────┘
-                                                          ↓
-                                                    main_pipeline.py
-                                                    (handoff logger)
-                                                          ↓
-                                                      main.py
-                                                   (Gradio UI)
-                                                          ↓
-                                                [Dashboard Output]
-                                         Severity | Summary | Inventory | Protocol | Logs
+frontend/app.js
+    │  POST /pipeline {audio_base64}
+    ▼
+backend/routers/pipeline.py
+    │
+    ├── agents/denoiser.py          raw.wav → clean.wav
+    ├── agents/intake_agent.py      clean.wav → transcript
+    ├── agents/retrieval_agent.py   transcript → {chunks, is_vague, top_score}
+    │       ├─ is_vague=True ──→ agents/vagueness_agent.py → expanded chunks
+    │       └─ is_vague=False ─→ original chunks
+    ├── agents/rag_triage_agent.py  chunks + transcript → situations[]
+    ├── agents/logistics_agent.py   situations[] → annotated with availability
+    │
+    └── Return: {request_id, situations[], retrieval_was_vague, source_chunks}
+    │
+    ▼
+frontend/app.js
+    renderHITLReport(situations)
+```
+
+### Manager Approval (HITL → Heap)
+```
+frontend/app.js
+    │  POST /approve {request_id, selected_indices, manual_override?}
+    ▼
+backend/routers/approve.py
+    ├── utils/inventory_manager.py   reserve items for selected situations
+    ├── core/priority_queue.py       push(request) with heap_key
+    ├── core/dispatch_engine.py      dispatch(queue) → assign volunteer
+    │
+    └── Return: {queue[], volunteers[]}
+```
+
+### Volunteer Return Flow
+```
+frontend/app.js  [Back at Base button → popup checklist]
+    │  POST /volunteer/return {volunteer_id, returned_items[]}
+    ▼
+backend/routers/volunteer_return.py
+    ├── utils/inventory_manager.py   restore(item, qty) for each returned item
+    ├── core/dispatch_engine.py      volunteer_return() → mark AVAILABLE
+    ├── core/dispatch_engine.py      dispatch(queue) → check next pending task
+    │
+    └── Return: {freed_volunteer, queue[], volunteers[], inventory[]}
+```
+
+### Background Escalation (Every 60s)
+```
+core/escalation_scheduler.py  (APScheduler job)
+    │
+    ├── core/priority_queue.py   get_sorted() → all PENDING requests
+    ├── [compute hours_wait, match escalation schedule]
+    └── core/priority_queue.py   update_key(request_id, new_key)
 ```
 
 ---
 
-## .gitignore (Recommended)
+## Inventory CSV Format
+
+```csv
+Item,Available,Reserved,Total,Bin Location,Category
+Leg Splint,4,0,4,A-1,Medical
+AED,2,0,2,C-3,Medical
+CPR Mask,5,0,5,A-4,Medical
+Bandages,50,0,50,A-2,Medical
+Tourniquets,10,0,10,A-1,Medical
+Water Bottles,200,0,200,B-3,Resources
+Energy Bars,150,0,150,B-1,Resources
+Blankets,30,0,30,C-1,Comfort
+Flashlights,15,0,15,D-2,Equipment
+```
+
+---
+
+## .gitignore
 
 ```gitignore
-# Large model files
 models/*.gguf
 models/*.bin
-models/*.pt
-
-# Auto-generated vector store
 vector_store/
-
-# Temporary audio files
 temp/*.wav
 temp/*.mp3
-
-# Python cache
+logs/*.jsonl
 __pycache__/
 *.pyc
-*.pyo
+venv/
 .env
-
-# OS files
+node_modules/
+dist/
 .DS_Store
-Thumbs.db
 ```
