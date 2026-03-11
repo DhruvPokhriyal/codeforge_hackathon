@@ -12,13 +12,15 @@ from pydantic import BaseModel
 # Core domain objects
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class MaterialItem(BaseModel):
     """One supply/equipment item required for a situation."""
+
     item: str
     quantity: int
-    available: bool = False      # annotated by logistics_agent
-    available_qty: int = 0       # annotated by logistics_agent
-    bin: str = "?"               # annotated by logistics_agent
+    available: bool = False  # annotated by logistics_agent
+    available_qty: int = 0  # annotated by logistics_agent
+    bin: str = "?"  # annotated by logistics_agent
 
 
 class Situation(BaseModel):
@@ -26,18 +28,19 @@ class Situation(BaseModel):
     One plausible emergency scenario produced by rag_triage_agent.
     Multiple situations are returned per request (multi-diagnostic output).
     """
+
     label: str
-    severity: str               # CRITICAL | HIGH | MEDIUM | LOW
-    severity_score: int         # CRITICAL=100, HIGH=75, MEDIUM=50, LOW=25
+    severity: str  # CRITICAL | HIGH | MEDIUM | LOW
+    severity_score: int  # CRITICAL=100, HIGH=75, MEDIUM=50, LOW=25
     confidence: float = 0.5
     travel_time_min: int
     resolution_time_min: int
-    heap_key: float = 0.0       # severity_score - (travel×2) - resolution_time
+    heap_key: float = 0.0  # severity_score - (travel×2) - resolution_time
     materials: list[MaterialItem] = []
     instructions: list[str] = []
     reasoning: str = ""
     source_chunks: list[str] = []
-    selected: bool = False       # set to True when HITL manager selects this situation
+    selected: bool = False  # set to True when HITL manager selects this situation
 
 
 class EmergencyRequest(BaseModel):
@@ -45,13 +48,14 @@ class EmergencyRequest(BaseModel):
     Full request lifecycle object — created at POST /pipeline,
     updated through approve → dispatch → return.
     """
+
     request_id: str
     time_of_request: str
     transcript: str
     is_vague: bool = False
     situations: list[Situation] = []
-    status: str = "PENDING"          # PENDING | ASSIGNED | RESOLVED
-    heap_key: float = 0.0            # key of dominant (highest) situation
+    status: str = "PENDING"  # PENDING | ASSIGNED | RESOLVED
+    heap_key: float = 0.0  # key of dominant (highest) situation
     assigned_volunteer: Optional[str] = None
     assigned_at: Optional[str] = None
     expected_return: Optional[str] = None
@@ -64,8 +68,9 @@ class EmergencyRequest(BaseModel):
 
 class VolunteerState(BaseModel):
     """Live state of one volunteer. Managed by dispatch_engine."""
+
     volunteer_id: str
-    status: str = "AVAILABLE"        # AVAILABLE | BUSY
+    status: str = "AVAILABLE"  # AVAILABLE | BUSY
     request_id: Optional[str] = None
     assigned_at: Optional[str] = None
     expected_return: Optional[str] = None
@@ -74,6 +79,7 @@ class VolunteerState(BaseModel):
 
 class InventoryItem(BaseModel):
     """One row from data/inventory.csv."""
+
     Item: str
     Available: int
     Reserved: int
@@ -86,32 +92,38 @@ class InventoryItem(BaseModel):
 # API request bodies
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class PipelineRequest(BaseModel):
     """POST /pipeline — incoming distress audio as base64 string."""
-    audio_b64: str   # base64-encoded .wav
+
+    audio_b64: str  # base64-encoded .wav
 
 
 class ApproveRequest(BaseModel):
     """POST /approve — HITL manager selects situations and triggers dispatch."""
+
     request_id: str
     selected_indices: list[int]
-    manual_override: Optional[dict] = None   # {"condition": str, "items": [str]}
+    manual_override: Optional[dict] = None  # {"condition": str, "items": [str]}
 
 
 class VolunteerReturnRequest(BaseModel):
     """POST /volunteer/return — volunteer back at base with returned items."""
+
     volunteer_id: str
-    returned_items: list[dict]   # [{"item": str, "quantity": int}]
+    returned_items: list[dict]  # [{"item": str, "quantity": int}]
 
 
 class InventoryRefillRequest(BaseModel):
     """PUT /inventory/refill — trigger a manual refill cycle."""
-    mode: str = "partial"   # "partial" | "daily"
+
+    mode: str = "partial"  # "partial" | "daily"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # API response shapes
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class PipelineResponse(BaseModel):
     request_id: str
