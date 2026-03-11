@@ -6,7 +6,7 @@
 
 from fastapi import APIRouter
 
-from core.dispatch_engine import VOLUNTEERS
+from core import VOLUNTEERS
 
 router = APIRouter()
 

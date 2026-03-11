@@ -6,7 +6,7 @@
 
 from fastapi import APIRouter
 
-from core.priority_queue import priority_queue
+from core import priority_queue
 
 router = APIRouter()
 

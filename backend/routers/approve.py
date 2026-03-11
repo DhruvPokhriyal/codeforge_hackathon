@@ -12,9 +12,7 @@
 from fastapi import APIRouter, HTTPException
 
 from schemas import ApproveRequest, ApproveResponse
-from core.priority_queue import priority_queue
-from core.request_store import request_store
-from core.dispatch_engine import dispatch
+from core import priority_queue, request_store, dispatch, VOLUNTEERS
 from utils.inventory_manager import InventoryManager
 
 router = APIRouter()
@@ -81,8 +79,6 @@ async def approve_request(body: ApproveRequest):
     # Push to priority heap and dispatch
     priority_queue.push(request_store.get(body.request_id))
     dispatch(priority_queue)
-
-    from core.dispatch_engine import VOLUNTEERS
 
     return ApproveResponse(
         request_id=body.request_id,
