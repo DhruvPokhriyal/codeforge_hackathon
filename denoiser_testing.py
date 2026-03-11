@@ -1,7 +1,8 @@
+import time
 import torch
 import torchaudio
 from pathlib import Path
-from denoiser.pretrained import dns48
+from denoiser.pretrained import master64
 
 NOISY_INPUT_DIR = "./noisy_input"
 DENOISED_OUTPUT_DIR = "./denoised_output"
@@ -31,7 +32,7 @@ def denoise_all():
         return
 
     print("Loading model...")
-    model = dns48()
+    model = master64()
     model.eval()
 
     print(f"Found {len(audio_files)} file(s). Starting denoising...\n")
@@ -39,14 +40,19 @@ def denoise_all():
     for file_path in sorted(audio_files):
         try:
             wav = load_audio(file_path)
+            duration = wav.shape[-1] / 16000
             wav_input = wav.unsqueeze(0)
 
+            t0 = time.perf_counter()
             with torch.no_grad():
                 enhanced = model(wav_input)[0]
+            elapsed = time.perf_counter() - t0
 
             out_path = output_dir / (file_path.stem + ".wav")
             torchaudio.save(str(out_path), enhanced.cpu(), 16000)
-            print(f"  [OK] {file_path.name} -> {out_path}")
+            print(
+                f"  [OK] {file_path.name} | audio: {duration:.2f}s | denoised in: {elapsed:.2f}s -> {out_path}"
+            )
 
         except Exception as e:
             print(f"  [FAIL] {file_path.name}: {e}")
