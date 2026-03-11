@@ -1,0 +1,21 @@
+[tool.poetry]
+package-mode = false
+
+[project]
+name = "codeforge-hackathon"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "DhruvPokhriyal",email = "171908255+DhruvPokhriyal@users.noreply.github.com"}
+]
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "denoiser (>=0.1.5,<0.2.0)",
+    "soundfile (>=0.13.1,<0.14.0)"
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
