@@ -175,4 +175,30 @@ pyrightconfig.json
 
 # End of https://www.toptal.com/developers/gitignore/api/python
 
+# ── Project-specific ignores ──────────────────────────────────────────────────
+
+# Frontend — Node / Electron
+frontend/node_modules/
+frontend/dist/
+frontend/out/
+
+# Backend — large binary model (download separately per SETUP.md)
+backend/models/*.gguf
+backend/models/*.bin
+
+# Backend — auto-generated vector index (rebuilt from PDFs on first run)
+backend/vector_store/
+!backend/vector_store/.gitkeep
+
+# Backend — runtime audio temp files
+backend/temp/*.wav
+backend/temp/*.mp3
+
+# Backend — append-only log (not tracked in git)
+backend/logs/*.jsonl
+
+# Test denoiser I/O (may contain large audio files)
+backend/tests/noisy_input/
+backend/tests/denoised_output/
+noisy_input/
 denoised_output/
