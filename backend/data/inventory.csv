@@ -1,0 +1,21 @@
+Item,Available,Reserved,Total,Bin Location,Category
+AED,2,0,2,A-01,Medical
+CPR Mask,5,0,5,A-01,Medical
+Leg Splint,4,0,4,A-02,Medical
+Arm Splint,4,0,4,A-02,Medical
+Neck Brace,2,0,2,A-02,Medical
+Bandage Roll,20,0,20,A-03,Medical
+Sterile Gauze,30,0,30,A-03,Medical
+Antiseptic Wipes,50,0,50,A-03,Medical
+Nitrile Gloves (pair),40,0,40,A-04,PPE
+Thermal Blanket,10,0,10,B-01,Comfort
+Water Bottle 500ml,60,0,60,B-02,Nutrition
+Energy Bar,40,0,40,B-02,Nutrition
+Insulin Kit,2,0,2,C-01,Medical
+EpiPen,3,0,3,C-01,Medical
+Oxygen Mask,2,0,2,C-02,Medical
+Blood Pressure Monitor,2,0,2,C-03,Medical
+Glucose Tablets,20,0,20,C-01,Medical
+Stretcher,2,0,2,D-01,Equipment
+Wheelchair,1,0,1,D-02,Equipment
+Flashlight,8,0,8,D-03,Equipment

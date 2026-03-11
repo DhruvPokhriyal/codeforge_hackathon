@@ -1,0 +1,3 @@
+# Append-only structured agent handoff log
+# Written by backend/utils/logger.py → log_handoff()
+# Each line is a JSON object: {timestamp, from_agent, to_agent, reason, payload}

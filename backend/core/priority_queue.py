@@ -21,13 +21,13 @@ from datetime import datetime
 
 class PriorityQueue:
     def __init__(self):
-        self._heap: list  = []          # [(-heap_key, timestamp_str, request_id)]
-        self._store: dict = {}          # request_id → request dict
+        self._heap: list = []  # [(-heap_key, timestamp_str, request_id)]
+        self._store: dict = {}  # request_id → request dict
 
     def push(self, request: dict) -> None:
         """Add a new request to the heap."""
-        key    = request["heap_key"]
-        ts     = request["time_of_request"]
+        key = request["heap_key"]
+        ts = request["time_of_request"]
         req_id = request["request_id"]
         heapq.heappush(self._heap, (-key, ts, req_id))
         self._store[req_id] = request

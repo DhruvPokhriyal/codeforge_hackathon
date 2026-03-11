@@ -1,0 +1,3 @@
+# Temporary audio files — cleared each session
+# REQ-XXXXXX_raw.wav   — original uploaded audio
+# REQ-XXXXXX_clean.wav — denoised output

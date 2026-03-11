@@ -1,0 +1,220 @@
+/* frontend/styles.css
+ * High-contrast dark emergency theme
+ *
+ * Severity colour system:
+ *   --critical : red     (life-threatening, immediate)
+ *   --high     : orange  (urgent, < 2 hours)
+ *   --medium   : yellow  (needs attention, < 8 hours)
+ *   --low      : green   (stable, monitor)
+ *
+ * State classes:
+ *   .greyed-out    — inventory item unavailable
+ *   .timer.overdue — negative countdown (displayed in red)
+ *   .hidden        — display:none helper
+ */
+
+/* ── Reset & variables ─────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg-primary:   #0d0d0d;
+  --bg-panel:     #1a1a1a;
+  --bg-card:      #242424;
+  --border:       #333;
+  --text-primary: #e8e8e8;
+  --text-muted:   #888;
+
+  --critical: #ff3b30;
+  --high:     #ff9500;
+  --medium:   #ffcc00;
+  --low:      #34c759;
+
+  --btn-primary:  #0a84ff;
+  --btn-approve:  #34c759;
+  --btn-danger:   #ff3b30;
+  --btn-secondary:#444;
+
+  --font: 'Segoe UI', system-ui, sans-serif;
+  --radius: 6px;
+}
+
+body {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font);
+  font-size: 14px;
+  line-height: 1.5;
+  overflow-x: hidden;
+}
+
+/* ── Header ─────────────────────────────────────────────────────────────────── */
+.app-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 24px;
+  background: #111;
+  border-bottom: 1px solid var(--border);
+}
+.app-header h1 { font-size: 18px; font-weight: 600; }
+.status-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  background: var(--low);
+  margin-left: auto;
+}
+.status-dot.offline { background: var(--critical); }
+
+/* ── Layout ──────────────────────────────────────────────────────────────────── */
+.layout {
+  display: grid;
+  grid-template-columns: 480px 1fr;
+  gap: 16px;
+  padding: 16px 24px;
+  height: calc(100vh - 55px);
+  overflow: hidden;
+}
+.column { display: flex; flex-direction: column; gap: 16px; overflow-y: auto; }
+
+/* ── Panels ──────────────────────────────────────────────────────────────────── */
+.panel {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+.panel h2 {
+  font-size: 14px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+}
+
+/* ── Buttons ─────────────────────────────────────────────────────────────────── */
+.btn {
+  display: inline-block;
+  padding: 8px 16px;
+  border: none;
+  border-radius: var(--radius);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.btn:hover { opacity: 0.85; }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn--primary   { background: var(--btn-primary);   color: #fff; }
+.btn--approve   { background: var(--btn-approve);   color: #000; margin-top: 12px; }
+.btn--secondary { background: var(--btn-secondary); color: #fff; }
+.btn--danger    { background: var(--btn-danger);    color: #fff; }
+
+/* ── Input panel ─────────────────────────────────────────────────────────────── */
+#input-panel input[type="file"] {
+  display: block;
+  margin: 8px 0;
+  color: var(--text-muted);
+}
+.status-text { margin-top: 8px; color: var(--text-muted); font-size: 12px; }
+
+/* ── Situation cards (HITL) ──────────────────────────────────────────────────── */
+.situation-card {
+  background: var(--bg-card);
+  border-left: 4px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px;
+  margin-bottom: 12px;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.situation-card.selected     { border-color: var(--btn-primary); }
+.situation-card.severity-critical { border-left-color: var(--critical); }
+.situation-card.severity-high     { border-left-color: var(--high); }
+.situation-card.severity-medium   { border-left-color: var(--medium); }
+.situation-card.severity-low      { border-left-color: var(--low); }
+
+.badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 99px;
+  text-transform: uppercase;
+}
+.badge-critical { background: var(--critical); color: #fff; }
+.badge-high     { background: var(--high);     color: #000; }
+.badge-medium   { background: var(--medium);   color: #000; }
+.badge-low      { background: var(--low);      color: #000; }
+
+.situation-card ul { list-style: none; margin: 6px 0; padding-left: 8px; }
+.situation-card li { padding: 2px 0; }
+.greyed-out { color: var(--text-muted); text-decoration: line-through; }
+.chunk-ref  { font-size: 11px; color: var(--text-muted); }
+
+/* ── Manual override ─────────────────────────────────────────────────────────── */
+.manual-override { margin-top: 12px; }
+.manual-override summary { cursor: pointer; color: var(--text-muted); font-size: 13px; }
+.manual-override input {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  padding: 6px 10px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+/* ── Data tables ─────────────────────────────────────────────────────────────── */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.data-table th {
+  text-align: left;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 11px;
+}
+.data-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid #222;
+}
+.data-table tbody tr:hover { background: #222; }
+
+/* ── Volunteer cards ─────────────────────────────────────────────────────────── */
+.volunteer-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.volunteer-card .vol-id    { font-weight: 700; min-width: 48px; }
+.volunteer-card .vol-status { font-size: 11px; padding: 2px 8px; border-radius: 99px; }
+.vol-status-available { background: var(--low);      color: #000; }
+.vol-status-busy      { background: var(--high);     color: #000; }
+.vol-status-overdue   { background: var(--critical); color: #fff; }
+.vol-timer { font-family: monospace; font-size: 13px; margin-left: auto; }
+.vol-timer.overdue { color: var(--critical); }
+
+/* ── Utilities ───────────────────────────────────────────────────────────────── */
+.hidden      { display: none !important; }
+.request-id  { font-size: 11px; color: var(--text-muted); margin-bottom: 4px; }
+.transcript-text {
+  background: var(--bg-card);
+  border-left: 3px solid var(--btn-primary);
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  font-style: italic;
+  font-size: 13px;
+  border-radius: 0 var(--radius) var(--radius) 0;
+}

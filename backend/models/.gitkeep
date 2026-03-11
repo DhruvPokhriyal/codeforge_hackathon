@@ -1,0 +1,5 @@
+# Place model file here before first run.
+# Required: Llama-3.2-3B-Instruct-Q4_K_M.gguf (~2GB)
+#
+# Download instructions in SETUP.md
+# Model path configured in backend/config.py → LLAMA_MODEL_PATH
