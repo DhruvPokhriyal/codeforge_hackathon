@@ -235,11 +235,29 @@ function renderTasks() {
   });
 }
 
-// ── Render: Agent Handoff Timeline ────────────────────────────────────────────
-function renderHandoffTimeline() {
-  const el = document.getElementById('handoff-timeline');
-  el.innerHTML = HANDOFF_LOG.map((entry, i) => {
-    const isLast = i === HANDOFF_LOG.length - 1;
+// ── Render: AI Review Panel (Human-in-the-Loop) ───────────────────────────────
+function renderAiPanel() {
+  const content = document.getElementById('ai-panel-content');
+  if (!content) return;
+
+  if (!selectedTaskId) {
+    content.innerHTML = '<div class="ai-no-selection">&#x25B6;&nbsp; Select a task to view AI analysis</div>';
+    return;
+  }
+
+  const task = TASKS.find(t => t.id === selectedTaskId);
+  if (!task) return;
+
+  const severityCls = task.priority === 'CRITICAL' ? 'critical-text' : 'high-text';
+
+  const stepsHtml = task.steps.map((s, i) => `
+    <div class="step-row">
+      <span class="step-num">${i + 1}</span>
+      <span class="step-text">${s}</span>
+    </div>`).join('');
+
+  const handoffHtml = task.handoff.map((entry, i) => {
+    const isLast = i === task.handoff.length - 1;
     return `
       <div class="handoff-entry">
         <div class="handoff-dot${entry.done ? ' done' : ''}"></div>
@@ -251,20 +269,55 @@ function renderHandoffTimeline() {
         </div>
       </div>`;
   }).join('');
-}
 
-// ── Render: Materials ─────────────────────────────────────────────────────────
-function renderMaterials() {
-  const el = document.getElementById('materials-list');
-  el.innerHTML = MOCK_ASSESSMENT.materials.map(m => {
-    const pct = (m.qty / m.total) * 100;
-    const cls = pct >= 80 ? 'green-text' : pct >= 40 ? 'orange-text' : 'critical-text';
+  const sourcesHtml = task.sources.map(s => `
+    <li class="source-item">
+      <span class="source-icon">&#x1F4C4;</span>
+      <span class="source-name">${s}</span>
+    </li>`).join('');
+
+  const itemsHtml = task.items.map(item => {
+    const inv   = INVENTORY.find(i => i.name === item.name);
+    const avail = inv ? inv.qty   : '?';
+    const total = inv ? inv.total : '?';
+    const pct   = (inv && inv.total > 0) ? (inv.qty / inv.total) * 100 : 100;
+    const cls   = pct >= 80 ? 'green-text' : pct >= 40 ? 'orange-text' : 'critical-text';
     return `
       <div class="material-row">
-        <span class="material-name">${m.name}</span>
-        <span class="material-qty ${cls}">${m.qty}/${m.total}</span>
+        <span class="material-name">${item.name} &times;${item.qty}</span>
+        <span class="material-qty ${cls}">${avail}/${total}</span>
       </div>`;
   }).join('');
+
+  content.innerHTML = `
+    <div class="ai-task-id">${task.id}</div>
+    <div class="ai-task-title">${task.title}</div>
+    <div class="ai-meta-chips">
+      <span class="ai-chip ${severityCls}">${task.priority}</span>
+      <span class="ai-chip">&#x23F1; ~${task.estTimeMins} min</span>
+      <span class="ai-chip">&#x1F465; ${task.estVictims}</span>
+    </div>
+    <hr class="divider" />
+
+    <div class="ai-section-label">TRANSCRIPT</div>
+    <div class="ai-transcript">${task.transcript}</div>
+    <hr class="divider" />
+
+    <div class="ai-section-label">STEPS TO TAKE</div>
+    <div class="steps-list">${stepsHtml}</div>
+    <hr class="divider" />
+
+    <div class="ai-section-label">AGENT HANDOFF</div>
+    <div class="handoff-timeline">${handoffHtml}</div>
+    <hr class="divider" />
+
+    <div class="ai-section-label">SOURCES</div>
+    <ul class="sources-list">${sourcesHtml}</ul>
+    <hr class="divider" />
+
+    <div class="ai-section-label">REQUIRED MATERIALS</div>
+    <div class="materials-list">${itemsHtml}</div>
+  `;
 }
 
 // ── Countdown Timers ──────────────────────────────────────────────────────────
