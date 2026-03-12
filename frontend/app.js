@@ -1,129 +1,53 @@
 // frontend/app.js
-// Digital Lifeboat — All renderer UI logic.
-// No backend integration; runs entirely on mock data for offline demo.
+// Digital Lifeboat — All renderer UI logic (Electron renderer).
 "use strict";
 
-// ── Mock Data ──────────────────────────────────────────────────────────────────
+// ── Config & State ─────────────────────────────────────────────────────────────
 
-const INVENTORY = [
-  { name: 'Water Bottles', qty: 47,  total: 100 },
-  { name: 'Medical Kits',  qty: 8,   total: 20  },
-  { name: 'Blankets',      qty: 5,   total: 50  },
-  { name: 'Food Rations',  qty: 120, total: 200 },
-  { name: 'Rescue Gear',   qty: 12,  total: 15  },
-  { name: 'First Aid Kits',qty: 3,   total: 30  },
-];
+const DEFAULT_CONFIG = {
+  polling: {
+    queueMs: 3000,
+    volunteersMs: 3000,
+    timersMs: 1000,
+  },
+  audio: {
+    acceptedExtensions: [".wav", ".mp3", ".flac", ".ogg", ".m4a"],
+  },
+  uiText: {
+    upload: {
+      dropHint: "Click to upload or drag & drop",
+      invalidFile: "Invalid file. Please drop a supported audio file.",
+      noFileSelected: "Please select an audio file first.",
+    },
+    processing: {
+      starting: "⏳ Denoising audio...",
+      steps: [
+        "⏳ Transcribing speech...",
+        "⏳ Running triage analysis...",
+        "⏳ Allocating resources...",
+      ],
+      done: "✓ Processing complete.",
+    },
+  },
+};
 
-const TASKS = [
-  {
-    id: 'REQ-001',
-    title: 'Residential Collapse — Pine St & 5th Ave',
-    priority: 'CRITICAL',
-    status: 'IN_PROGRESS',
-    location: 'Downtown',
-    volunteer: 'VOL-07',
-    elapsedSec: 0,
-    escalated: true,
-    transcript: '\u201cBuilding collapsed on Pine Street, multiple people trapped, need immediate assistance.\u201d',
-    estVictims: '5\u20138',
-    estTimeMins: 45,
-    steps: [
-      'Secure perimeter \u2014 50 m radius, redirect civilian traffic.',
-      'Deploy structural assessment team before any entry.',
-      'Establish triage station at NE corner of intersection.',
-      'Initiate void-space search using rescue gear.',
-      'Radio status update every 10 minutes to HQ.',
-    ],
-    sources: [
-      'FEMA Urban Search & Rescue Field Operations Guide.pdf',
-      'Multi-Victim Structural Collapse Protocol v3.pdf',
-      'Downtown Zone Hazard Map 2025.pdf',
-    ],
-    handoff: [
-      { agent: 'Intake Agent',    time: '14:23:01', note: 'Audio denoised & transcribed.',             done: true  },
-      { agent: 'Triage Agent',    time: '14:23:04', note: 'Severity: CRITICAL \u2014 Est. 5\u20138 victims.', done: true  },
-      { agent: 'RAG Agent',       time: '14:23:05', note: 'Protocol docs retrieved (3 sources).',      done: true  },
-      { agent: 'Logistics Agent', time: '14:23:07', note: 'Resources allocated, VOL-07 dispatched.',   done: true  },
-    ],
-    items: [
-      { name: 'Medical Kits', qty: 2 },
-      { name: 'Rescue Gear',  qty: 3 },
-      { name: 'Stretcher',    qty: 1 },
-    ],
-  },
-  {
-    id: 'REQ-002',
-    title: 'Hospital Backup Power Failure \u2014 Medical Center',
-    priority: 'HIGH',
-    status: 'PENDING',
-    location: 'Midtown',
-    volunteer: null,
-    elapsedSec: 0,
-    escalated: false,
-    transcript: '\u201cMedical center on Midtown Ave has lost main power. ICU and OR on backup. Backup generator also failing.\u201d',
-    estVictims: '120+ patients at risk',
-    estTimeMins: 30,
-    steps: [
-      'Contact facility engineer for generator room access.',
-      'Deploy portable generator unit to loading dock B.',
-      'Prioritise power to ICU, OR, and neonatal ward.',
-      'Coordinate with grid operator for emergency reconnect.',
-      'Station technician on-site until main power restored.',
-    ],
-    sources: [
-      'Hospital Emergency Power Standard IEC 60364-7-710.pdf',
-      'Mass Casualty Power Failure Response Plan v2.pdf',
-    ],
-    handoff: [
-      { agent: 'Intake Agent',    time: '14:31:10', note: 'Audio transcribed \u2014 power failure confirmed.',  done: true  },
-      { agent: 'Triage Agent',    time: '14:31:13', note: 'Severity: HIGH \u2014 life support at risk.',         done: true  },
-      { agent: 'RAG Agent',       time: '14:31:14', note: 'IEC standard & response plan retrieved.',         done: true  },
-      { agent: 'Logistics Agent', time: '14:31:16', note: 'Awaiting volunteer assignment.',                   done: false },
-    ],
-    items: [
-      { name: 'Generator',      qty: 1 },
-      { name: 'Fuel Canisters', qty: 4 },
-    ],
-  },
-  {
-    id: 'REQ-003',
-    title: 'Water Main Rupture \u2014 Central Park Area',
-    priority: 'HIGH',
-    status: 'IN_PROGRESS',
-    location: 'North',
-    volunteer: 'VOL-03',
-    elapsedSec: 24,
-    escalated: false,
-    transcript: '\u201cLarge water main burst near Central Park north entrance. Street flooding, basement units at risk.\u201d',
-    estVictims: '~40 residents',
-    estTimeMins: 90,
-    steps: [
-      'Shut off water main valve at Junction Node 7-N.',
-      'Deploy water pumps to prevent basement flooding.',
-      'Erect safety barriers on affected road sections.',
-      'Notify utilities for emergency repair crew dispatch.',
-      'Establish temporary water supply for affected residents.',
-    ],
-    sources: [
-      'City Water Infrastructure Emergency Manual.pdf',
-      'North Zone Utility Map v2024.pdf',
-    ],
-    handoff: [
-      { agent: 'Intake Agent',    time: '14:45:00', note: 'Audio transcribed \u2014 rupture location confirmed.', done: true  },
-      { agent: 'Triage Agent',    time: '14:45:02', note: 'Severity: HIGH \u2014 ~40 residents at flood risk.',   done: true  },
-      { agent: 'RAG Agent',       time: '14:45:03', note: 'Utility manuals retrieved (2 sources).',             done: true  },
-      { agent: 'Logistics Agent', time: '14:45:05', note: 'Resources allocated, VOL-03 dispatched.',            done: true  },
-    ],
-    items: [
-      { name: 'Water Pump',      qty: 1 },
-      { name: 'Safety Barriers', qty: 6 },
-    ],
-  },
-];
+// Live configuration (overridden by backend /settings/frontend if available)
+let DL_CONFIG = { ...DEFAULT_CONFIG };
+
+// Live data — populated from backend.
+let INVENTORY = [];
+let QUEUE = [];
+let VOLUNTEERS = [];
+
+// Latest unapproved pipeline response (for HITL panel)
+let CURRENT_PIPELINE = null;
+
+// Local per-request timers (seconds since assignment) keyed by request_id
+const REQUEST_TIMERS = {};
 
 // ── State ──────────────────────────────────────────────────────────────────────
-let activeTaskId   = null;
-let selectedTaskId = TASKS[0].id;   // pre-select first task for immediate AI panel display
+let activeTaskId = null;      // request currently in "Returned" modal
+let selectedTaskId = null;    // request selected in queue panel
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function formatTimer(s) {
@@ -154,14 +78,16 @@ function formatTimer(s) {
 function renderInventory() {
   const el = document.getElementById('inventory-list');
   el.innerHTML = INVENTORY.map(item => {
-    const pct     = Math.round((item.qty / item.total) * 100);
+    const available = item.Available ?? item.qty ?? 0;
+    const total = item.Total ?? item.total ?? 0;
+    const pct     = total > 0 ? Math.round((available / total) * 100) : 0;
     const isCrit  = pct < 20;
     const countCls = isCrit ? 'inv-count critical-text' : 'inv-count';
     return `
       <div class="inv-item">
         <div class="inv-item-header">
-          <span class="inv-name">${item.name}</span>
-          <span class="${countCls}">${item.qty}/${item.total}</span>
+          <span class="inv-name">${item.Item ?? item.name}</span>
+          <span class="${countCls}">${available}/${total}</span>
         </div>
         <div class="inv-bar-track">
           <div class="inv-bar-fill${isCrit ? ' inv-bar-low' : ''}" style="width:${pct}%"></div>
@@ -177,31 +103,35 @@ function renderInventory() {
 // ── Render: Task Cards ─────────────────────────────────────────────────────────
 function renderTasks() {
   const el = document.getElementById('task-list');
-  const active = TASKS.filter(t => t.status !== 'COMPLETE');
+  const active = QUEUE.filter(t => t.status !== 'RESOLVED');
   document.getElementById('incident-count').textContent = active.length;
 
   el.innerHTML = active.map(task => {
-    const p           = task.priority.toLowerCase();
-    const stateClass  = task.status === 'IN_PROGRESS' ? 'in-progress' : 'pending';
-    const statusLabel = task.status === 'IN_PROGRESS' ? 'IN PROGRESS' : 'PENDING';
+    const p           = (task.priority || task.severity || 'HIGH').toString().toLowerCase();
+    const status      = task.status || 'PENDING';
+    const stateClass  = status === 'IN_PROGRESS' || status === 'ASSIGNED' ? 'in-progress' : 'pending';
+    const statusLabel = stateClass === 'in-progress' ? (status || 'IN PROGRESS') : 'PENDING';
     const escalIcon   = task.escalated
       ? '<span class="escalated-icon" title="Priority escalated">&#x26A0;</span>'
       : '';
-    const completeBtn = task.status === 'IN_PROGRESS'
-      ? `<button class="btn btn-complete" data-id="${task.id}">COMPLETE</button>`
+    const hasVolunteer = !!(task.assigned_volunteer);
+    const completeBtn = hasVolunteer
+      ? `<button class="btn btn-complete" data-id="${task.request_id}">BACK AT BASE</button>`
       : '';
-    const volunteerLine = task.volunteer
-      ? `<div class="card-volunteer">&#x1F464; ${task.volunteer}</div>`
+    const volunteerId = task.volunteer || task.assigned_volunteer;
+    const volunteerLine = volunteerId
+      ? `<div class="card-volunteer">&#x1F464; ${volunteerId}</div>`
       : '';
-    const timer    = formatTimer(task.elapsedSec);
-    const timerCls = task.elapsedSec > 600 ? 'card-timer overdue' : 'card-timer';
-    const selCls   = task.id === selectedTaskId ? ' card-selected' : '';
+    const timerSec = REQUEST_TIMERS[task.request_id] ?? 0;
+    const timer    = formatTimer(timerSec);
+    const timerCls = timerSec > 600 ? 'card-timer overdue' : 'card-timer';
+    const selCls   = task.request_id === selectedTaskId ? ' card-selected' : '';
 
     return `
-      <div class="task-card priority-${p} ${stateClass}${selCls}" data-task-id="${task.id}">
+      <div class="task-card priority-${p} ${stateClass}${selCls}" data-task-id="${task.request_id}">
         <div class="card-top">
           <div class="card-badges">
-            <span class="priority-badge badge-${p}">[${task.priority}]</span>
+            <span class="priority-badge badge-${p}">[${task.priority || task.severity}]</span>
             ${escalIcon}
             <span class="status-badge status-${stateClass}">${statusLabel}</span>
           </div>
@@ -240,47 +170,125 @@ function renderAiPanel() {
   const content = document.getElementById('ai-panel-content');
   if (!content) return;
 
-  if (!selectedTaskId) {
-    content.innerHTML = '<div class="ai-no-selection">&#x25B6;&nbsp; Select a task to view AI analysis</div>';
-    return;
-  }
+  // If there is a fresh pipeline result waiting for approval, prioritise showing that
+  if (CURRENT_PIPELINE) {
+    const sit = CURRENT_PIPELINE.situations?.[0];
+    if (!sit) {
+      content.innerHTML = '<div class="ai-no-selection">No situations returned from pipeline.</div>';
+      return;
+    }
+    const priority = sit.severity || 'HIGH';
+    const severityCls = priority === 'CRITICAL' ? 'critical-text' : 'high-text';
 
-  const task = TASKS.find(t => t.id === selectedTaskId);
-  if (!task) return;
-
-  const severityCls = task.priority === 'CRITICAL' ? 'critical-text' : 'high-text';
-
-  const stepsHtml = task.steps.map((s, i) => `
+    const steps = sit.instructions || [];
+    const stepsHtml = steps.map((s, i) => `
     <div class="step-row">
       <span class="step-num">${i + 1}</span>
       <span class="step-text">${s}</span>
     </div>`).join('');
 
-  const handoffHtml = task.handoff.map((entry, i) => {
+    const sources = sit.source_chunks || [];
+    const sourcesHtml = sources.map(s => `
+    <li class="source-item">
+      <span class="source-icon">&#x1F4C4;</span>
+      <span class="source-name">${s}</span>
+    </li>`).join('');
+
+    const items = (sit.materials || []).map(m => ({
+      name: m.item,
+      qty: m.quantity,
+    }));
+    const itemsHtml = items.map(item => {
+      const inv   = INVENTORY.find(i => (i.Item ?? i.name) === item.name);
+      const avail = inv ? (inv.Available ?? inv.qty) : '?';
+      const total = inv ? (inv.Total ?? inv.total) : '?';
+      const pct   = (inv && inv.Total > 0) ? (inv.Available / inv.Total) * 100 : 100;
+      const cls   = pct >= 80 ? 'green-text' : pct >= 40 ? 'orange-text' : 'critical-text';
+      return `
+      <div class="material-row">
+        <span class="material-name">${item.name} &times;${item.qty}</span>
+        <span class="material-qty ${cls}">${avail}/${total}</span>
+      </div>`;
+    }).join('');
+
+    content.innerHTML = `
+    <div class="ai-task-id">${CURRENT_PIPELINE.request_id}</div>
+    <div class="ai-task-title">${sit.label || 'Emergency Request'}</div>
+    <div class="ai-meta-chips">
+      <span class="ai-chip ${severityCls}">${priority}</span>
+      <span class="ai-chip">&#x23F1; ~${sit.resolution_time_min ?? '?'} min</span>
+    </div>
+    <hr class="divider" />
+
+    <div class="ai-section-label">TRANSCRIPT</div>
+    <div class="ai-transcript">${CURRENT_PIPELINE.transcript}</div>
+    <hr class="divider" />
+
+    <div class="ai-section-label">STEPS TO TAKE</div>
+    <div class="steps-list">${stepsHtml}</div>
+    <hr class="divider" />
+
+    <div class="ai-section-label">SOURCES</div>
+    <ul class="sources-list">${sourcesHtml}</ul>
+    <hr class="divider" />
+
+    <div class="ai-section-label">REQUIRED MATERIALS</div>
+    <div class="materials-list">${itemsHtml}</div>
+    `;
+    return;
+  }
+
+  if (!selectedTaskId) {
+    content.innerHTML = '<div class="ai-no-selection">&#x25B6;&nbsp; Select a task to view AI analysis</div>';
+    return;
+  }
+
+  const task = QUEUE.find(t => t.request_id === selectedTaskId);
+  if (!task) return;
+
+  const priority = task.priority || task.severity || 'HIGH';
+  const severityCls = priority === 'CRITICAL' ? 'critical-text' : 'high-text';
+
+  const steps = task.steps || task.instructions || [];
+  const stepsHtml = steps.map((s, i) => `
+    <div class="step-row">
+      <span class="step-num">${i + 1}</span>
+      <span class="step-text">${s}</span>
+    </div>`).join('');
+
+  const handoff = task.handoff || task.handoff_logs || [];
+  const handoffHtml = handoff.map((entry, i) => {
     const isLast = i === task.handoff.length - 1;
     return `
       <div class="handoff-entry">
         <div class="handoff-dot${entry.done ? ' done' : ''}"></div>
         ${!isLast ? '<div class="handoff-line"></div>' : '<div></div>'}
         <div class="handoff-content">
-          <div class="handoff-agent">${entry.agent}</div>
-          <div class="handoff-time">${entry.time}</div>
-          <div class="handoff-note">${entry.note}</div>
+          <div class="handoff-agent">${entry.agent || entry.step || 'Agent'}</div>
+          <div class="handoff-time">${entry.time || ''}</div>
+          <div class="handoff-note">${entry.note || entry.reason || ''}</div>
         </div>
       </div>`;
   }).join('');
 
-  const sourcesHtml = task.sources.map(s => `
+  const sources = task.sources || task.source_chunks || [];
+  const sourcesHtml = sources.map(s => `
     <li class="source-item">
       <span class="source-icon">&#x1F4C4;</span>
       <span class="source-name">${s}</span>
     </li>`).join('');
 
-  const itemsHtml = task.items.map(item => {
-    const inv   = INVENTORY.find(i => i.name === item.name);
-    const avail = inv ? inv.qty   : '?';
-    const total = inv ? inv.total : '?';
-    const pct   = (inv && inv.total > 0) ? (inv.qty / inv.total) * 100 : 100;
+  const items = task.items || (task.materials || []).map(m => ({
+    name: m.item,
+    qty: m.quantity,
+  }));
+  const itemsHtml = items.map(item => {
+    const inv   = INVENTORY.find(i => (i.Item ?? i.name) === item.name);
+    const avail = inv ? (inv.Available ?? inv.qty) : '?';
+    const total = inv ? (inv.Total ?? inv.total) : '?';
+    const baseAvail = inv ? (inv.Available ?? inv.qty) : 0;
+    const baseTotal = inv ? (inv.Total ?? inv.total) : 0;
+    const pct   = baseTotal > 0 ? (baseAvail / baseTotal) * 100 : 100;
     const cls   = pct >= 80 ? 'green-text' : pct >= 40 ? 'orange-text' : 'critical-text';
     return `
       <div class="material-row">
@@ -290,12 +298,12 @@ function renderAiPanel() {
   }).join('');
 
   content.innerHTML = `
-    <div class="ai-task-id">${task.id}</div>
-    <div class="ai-task-title">${task.title}</div>
+    <div class="ai-task-id">${task.id || task.request_id}</div>
+    <div class="ai-task-title">${task.title || (task.situations && task.situations[0]?.label) || 'Emergency Request'}</div>
     <div class="ai-meta-chips">
-      <span class="ai-chip ${severityCls}">${task.priority}</span>
-      <span class="ai-chip">&#x23F1; ~${task.estTimeMins} min</span>
-      <span class="ai-chip">&#x1F465; ${task.estVictims}</span>
+      <span class="ai-chip ${severityCls}">${priority}</span>
+      <span class="ai-chip">&#x23F1; ~${task.estTimeMins ?? (task.situations?.[0]?.resolution_time_min ?? '?')} min</span>
+      <span class="ai-chip">&#x1F465; ${task.estVictims ?? ''}</span>
     </div>
     <hr class="divider" />
 
@@ -322,26 +330,20 @@ function renderAiPanel() {
 
 // ── Countdown Timers ──────────────────────────────────────────────────────────
 function tickTimers() {
-  let needsFullRender = false;
-  TASKS.forEach(task => {
-    if (task.status !== 'IN_PROGRESS') return;
-    task.elapsedSec++;
-    // Auto-escalate if over 10 minutes
-    if (task.elapsedSec > 600 && !task.escalated) {
-      task.escalated = true;
-      needsFullRender = true;
-    }
-    // Update timer display in-place
-    const card = document.querySelector(`.task-card[data-task-id="${task.id}"]`);
+  QUEUE.forEach(task => {
+    if (task.status !== 'ASSIGNED') return;
+    const id = task.request_id;
+    REQUEST_TIMERS[id] = (REQUEST_TIMERS[id] ?? 0) + 1;
+    const card = document.querySelector(`.task-card[data-task-id="${id}"]`);
     if (card) {
       const timerEl = card.querySelector('.card-timer');
       if (timerEl) {
-        timerEl.textContent = `T-${formatTimer(task.elapsedSec)}`;
-        if (task.elapsedSec > 600) timerEl.classList.add('overdue');
+        const secs = REQUEST_TIMERS[id];
+        timerEl.textContent = `T-${formatTimer(secs)}`;
+        if (secs > 600) timerEl.classList.add('overdue');
       }
     }
   });
-  if (needsFullRender) renderTasks();
 }
 
 // ── Upload Zone ────────────────────────────────────────────────────────────────
@@ -349,6 +351,15 @@ function tickTimers() {
   const zone        = document.getElementById('upload-zone');
   const fileInput   = document.getElementById('audio-file');
   const uploadLabel = document.getElementById('upload-label');
+
+  // Apply configured accepted extensions to the file input
+  if (fileInput && DL_CONFIG.audio?.acceptedExtensions) {
+    fileInput.accept = DL_CONFIG.audio.acceptedExtensions.join(',');
+  }
+
+  if (uploadLabel && DL_CONFIG.uiText?.upload?.dropHint) {
+    uploadLabel.innerHTML = DL_CONFIG.uiText.upload.dropHint.replace(/\n/g, '<br>');
+  }
 
   zone.addEventListener('dragover', e => {
     e.preventDefault();
@@ -359,11 +370,14 @@ function tickTimers() {
     e.preventDefault();
     zone.classList.remove('dragging');
     const f = e.dataTransfer.files[0];
-    if (f && /\.(mp3|wav)$/i.test(f.name)) {
+    const exts = DL_CONFIG.audio.acceptedExtensions || [];
+    const re = new RegExp(`\\.(${exts.map(x => x.replace('.', '')).join('|')})$`, 'i');
+    if (f && re.test(f.name)) {
       uploadLabel.textContent = f.name;
       zone.classList.add('has-file');
     } else {
-      uploadLabel.innerHTML = 'Invalid file.<br>Drop .mp3 or .wav';
+      const msg = DL_CONFIG.uiText.upload.invalidFile || 'Invalid file.';
+      uploadLabel.innerHTML = msg.replace(/\n/g, '<br>');
     }
   });
 
@@ -382,9 +396,15 @@ function tickTimers() {
   const status  = document.getElementById('process-status');
   const waveform = document.getElementById('waveform');
   const zone    = document.getElementById('upload-zone');
+  const fileInput = document.getElementById('audio-file');
 
   btn.addEventListener('click', () => {
-    if (!zone.classList.contains('has-file')) {
+    if (!zone.classList.contains('has-file') || !fileInput || !fileInput.files[0]) {
+      const msg = DL_CONFIG.uiText.upload.noFileSelected || 'Please select an audio file first.';
+      if (status) {
+        status.classList.remove('hidden', 'text-success');
+        status.textContent = msg;
+      }
       zone.classList.add('zone-shake');
       setTimeout(() => zone.classList.remove('zone-shake'), 600);
       return;
@@ -393,26 +413,57 @@ function tickTimers() {
     btn.disabled = true;
     btn.textContent = 'PROCESSING...';
     status.classList.remove('hidden', 'text-success');
-    status.textContent = '\u23F3 Denoising audio...';
+    status.textContent = DL_CONFIG.uiText.processing.starting;
     waveform.classList.add('active');
 
-    const steps = [
-      [1600, '\u23F3 Transcribing speech...'],
-      [3200, '\u23F3 Running triage analysis...'],
-      [4800, '\u23F3 Allocating resources...'],
-    ];
-
-    steps.forEach(([delay, msg]) => {
-      setTimeout(() => { status.textContent = msg; }, delay);
+    const steps = DL_CONFIG.uiText.processing.steps || [];
+    const stepDelay = 1600;
+    steps.forEach((msg, idx) => {
+      setTimeout(() => { status.textContent = msg; }, stepDelay * (idx + 1));
     });
 
-    setTimeout(() => {
-      status.textContent = '\u2713 Processing complete.';
-      status.classList.add('text-success');
-      btn.disabled = false;
-      btn.textContent = 'PROCESS MEMO';
-      waveform.classList.remove('active');
-    }, 6400);
+    // If backend API is available, send the audio as base64
+    const file = fileInput.files[0];
+    if (window.api && typeof window.api.runPipeline === 'function' && file) {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const buffer = e.target.result;
+          const bytes = new Uint8Array(buffer);
+          let binary = "";
+          for (let i = 0; i < bytes.byteLength; i++) {
+            binary += String.fromCharCode(bytes[i]);
+          }
+          const audioB64 = btoa(binary);
+          const resp = await window.api.runPipeline(audioB64);
+
+          // Hold the latest pipeline result for HITL approval in the AI panel
+          CURRENT_PIPELINE = resp;
+          selectedTaskId = null;
+          renderAiPanel();
+
+          status.textContent = DL_CONFIG.uiText.processing.done;
+          status.classList.add('text-success');
+        } catch (err) {
+          console.error('Pipeline error', err);
+          status.textContent = 'Pipeline error. See console.';
+        } finally {
+          btn.disabled = false;
+          btn.textContent = 'PROCESS MEMO';
+          waveform.classList.remove('active');
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    } else {
+      // Fallback: no backend available, just complete after a delay
+      setTimeout(() => {
+        status.textContent = DL_CONFIG.uiText.processing.done;
+        status.classList.add('text-success');
+        btn.disabled = false;
+        btn.textContent = 'PROCESS MEMO';
+        waveform.classList.remove('active');
+      }, stepDelay * ((DL_CONFIG.uiText.processing.steps || []).length + 2));
+    }
   });
 })();
 
@@ -420,14 +471,36 @@ function tickTimers() {
 (function initApprove() {
   const btnApprove = document.getElementById('btn-approve');
   btnApprove.addEventListener('click', () => {
-    btnApprove.textContent = '\u2713 APPROVED';
-    btnApprove.classList.add('btn-approved');
+    if (!window.api || typeof window.api.approveReport !== 'function') return;
+    if (!CURRENT_PIPELINE) return;
+
     btnApprove.disabled = true;
-    setTimeout(() => {
-      btnApprove.textContent = 'APPROVE';
-      btnApprove.classList.remove('btn-approved');
-      btnApprove.disabled = false;
-    }, 2500);
+    btnApprove.textContent = 'APPROVING...';
+
+    // For now, auto-select the top situation (index 0)
+    const selected_indices = [0];
+    const manual_override = window.__DL_PENDING_OVERRIDE || null;
+
+    window.api.approveReport(CURRENT_PIPELINE.request_id, selected_indices, manual_override)
+      .then(resp => {
+        // Update queue and volunteers from backend response
+        QUEUE = resp.queue || [];
+        VOLUNTEERS = resp.volunteers || [];
+
+        // Clear current pipeline / override
+        CURRENT_PIPELINE = null;
+        window.__DL_PENDING_OVERRIDE = null;
+
+        renderTasks();
+        renderAiPanel();
+      })
+      .catch(err => {
+        console.error('Approve error', err);
+      })
+      .finally(() => {
+        btnApprove.textContent = 'APPROVE';
+        btnApprove.disabled = false;
+      });
   });
 })();
 
@@ -447,7 +520,7 @@ function openOverrideModal() {
 
     const nameEl = document.createElement('span');
     nameEl.className = 'override-item-name';
-    nameEl.textContent = item.name;
+    nameEl.textContent = item.Item ?? item.name;
 
     const btnMinus = document.createElement('button');
     btnMinus.className = 'btn btn-qty';
@@ -459,8 +532,9 @@ function openOverrideModal() {
     qtyInput.className = 'qty-input';
     qtyInput.value = 0;
     qtyInput.min = 0;
-    qtyInput.max = item.qty;
-    qtyInput.dataset.item = item.name;
+    const maxQty = item.Available ?? item.qty ?? 0;
+    qtyInput.max = maxQty;
+    qtyInput.dataset.item = item.Item ?? item.name;
 
     const btnPlus = document.createElement('button');
     btnPlus.className = 'btn btn-qty';
@@ -469,7 +543,7 @@ function openOverrideModal() {
 
     const availEl = document.createElement('span');
     availEl.className = 'override-item-avail';
-    availEl.textContent = `avail: ${item.qty}`;
+    availEl.textContent = `avail: ${maxQty}`;
 
     btnMinus.addEventListener('click', () => {
       qtyInput.value = Math.max(0, parseInt(qtyInput.value || 0) - 1);
@@ -513,8 +587,12 @@ function closeOverrideModal() {
       .map(inp => ({ item: inp.dataset.item, qty: parseInt(inp.value || 0) }))
       .filter(r => r.qty > 0);
 
-    // Log to console (no backend integration)
-    console.log('[OVERRIDE]', { situation, steps, resources });
+    // Store pending manual override payload to be attached on next APPROVE
+    window.__DL_PENDING_OVERRIDE = {
+      condition: situation,
+      items: resources.map(r => r.item),
+      notes: steps,
+    };
 
     closeOverrideModal();
   });
@@ -522,25 +600,26 @@ function closeOverrideModal() {
 
 // ── Complete & Returned Modal ──────────────────────────────────────────────────
 function openCompleteModal(taskId) {
-  const task = TASKS.find(t => t.id === taskId);
+  const task = QUEUE.find(t => t.request_id === taskId);
   if (!task) return;
   activeTaskId = taskId;
 
   const checklist = document.getElementById('modal-checklist');
   checklist.innerHTML = '';
 
-  task.items.forEach(item => {
+  const items = task.items_taken || [];
+  items.forEach(item => {
     const row = document.createElement('div');
     row.className = 'override-item-row';  // reuse the same row style as Override modal
 
     // Name + "taken" label
     const nameEl = document.createElement('span');
     nameEl.className = 'override-item-name';
-    nameEl.textContent = item.name;
+    nameEl.textContent = item.item;
 
     const takenEl = document.createElement('span');
     takenEl.className = 'override-item-avail';
-    takenEl.textContent = `taken: ${item.qty}`;
+    takenEl.textContent = `taken: ${item.quantity}`;
 
     const btnMinus = document.createElement('button');
     btnMinus.className = 'btn btn-qty';
@@ -550,11 +629,11 @@ function openCompleteModal(taskId) {
     const qtyInput = document.createElement('input');
     qtyInput.type = 'number';
     qtyInput.className = 'qty-input return-qty';
-    qtyInput.value = item.qty;   // default to full return
+    qtyInput.value = item.quantity;   // default to full return
     qtyInput.min = 0;
-    qtyInput.max = item.qty;
-    qtyInput.dataset.item = item.name;
-    qtyInput.dataset.max  = item.qty;
+    qtyInput.max = item.quantity;
+    qtyInput.dataset.item = item.item;
+    qtyInput.dataset.max  = item.quantity;
 
     const btnPlus = document.createElement('button');
     btnPlus.className = 'btn btn-qty';
@@ -599,26 +678,38 @@ document.getElementById('modal-cancel').addEventListener('click', closeModal);
 
 document.getElementById('modal-confirm').addEventListener('click', () => {
   if (!activeTaskId) return;
-  const task = TASKS.find(t => t.id === activeTaskId);
-  if (task) {
-    task.status = 'COMPLETE';
-    // Return only the quantities the user entered
-    document.querySelectorAll('.return-qty').forEach(inp => {
-      const returned = parseInt(inp.value || 0);
-      if (returned <= 0) return;
-      const inv = INVENTORY.find(i => i.name === inp.dataset.item);
-      if (inv) inv.qty = Math.min(inv.total, inv.qty + returned);
-    });
-    // If the completed task was selected, move selection to next available
-    if (selectedTaskId === activeTaskId) {
-      const next = TASKS.find(t => t.status !== 'COMPLETE' && t.id !== activeTaskId);
-      selectedTaskId = next ? next.id : null;
-    }
+  const task = QUEUE.find(t => t.request_id === activeTaskId);
+  if (!task || !window.api || typeof window.api.volunteerReturn !== 'function') {
+    closeModal();
+    return;
   }
-  closeModal();
-  renderTasks();
-  renderInventory();
-  renderAiPanel();
+
+  const returned_items = [];
+  document.querySelectorAll('.return-qty').forEach(inp => {
+    const qty = parseInt(inp.value || 0);
+    if (qty > 0) {
+      returned_items.push({ item: inp.dataset.item, quantity: qty });
+    }
+  });
+
+  const volunteerId = task.assigned_volunteer;
+  window.api.volunteerReturn(volunteerId, returned_items)
+    .then(resp => {
+      QUEUE = resp.queue || [];
+      VOLUNTEERS = resp.volunteers || [];
+      INVENTORY = resp.inventory || INVENTORY;
+      // Drop local timer for this request
+      delete REQUEST_TIMERS[activeTaskId];
+      renderTasks();
+      renderInventory();
+      renderAiPanel();
+    })
+    .catch(err => {
+      console.error('Volunteer return error', err);
+    })
+    .finally(() => {
+      closeModal();
+    });
 });
 
 // Close modal on overlay click
@@ -635,9 +726,109 @@ document.addEventListener('keydown', e => {
 });
 
 // ── Initialise ────────────────────────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', () => {
+async function bootstrapApp() {
+  // Load config from backend if available
+  if (window.api && typeof window.api.getSettings === 'function') {
+    try {
+      const settings = await window.api.getSettings();
+      DL_CONFIG = {
+        polling: {
+          queueMs: settings.polling?.queue_ms ?? DEFAULT_CONFIG.polling.queueMs,
+          volunteersMs: settings.polling?.volunteers_ms ?? DEFAULT_CONFIG.polling.volunteersMs,
+          timersMs: settings.polling?.timers_ms ?? DEFAULT_CONFIG.polling.timersMs,
+        },
+        audio: {
+          acceptedExtensions: settings.audio?.accepted_extensions ?? DEFAULT_CONFIG.audio.acceptedExtensions,
+        },
+        uiText: {
+          upload: {
+            dropHint: settings.ui_text?.upload?.drop_hint ?? DEFAULT_CONFIG.uiText.upload.dropHint,
+            invalidFile: settings.ui_text?.upload?.invalid_file ?? DEFAULT_CONFIG.uiText.upload.invalidFile,
+            noFileSelected: settings.ui_text?.upload?.no_file_selected ?? DEFAULT_CONFIG.uiText.upload.noFileSelected,
+          },
+          processing: {
+            starting: settings.ui_text?.processing?.starting ?? DEFAULT_CONFIG.uiText.processing.starting,
+            steps: settings.ui_text?.processing?.steps ?? DEFAULT_CONFIG.uiText.processing.steps,
+            done: settings.ui_text?.processing?.done ?? DEFAULT_CONFIG.uiText.processing.done,
+          },
+        },
+      };
+    } catch (err) {
+      console.warn('Failed to load settings from backend, using defaults.', err);
+    }
+  }
+
+  // Initial inventory load
+  if (window.api && typeof window.api.getInventory === 'function') {
+    try {
+      const resp = await window.api.getInventory();
+      INVENTORY = resp.inventory || [];
+    } catch (err) {
+      console.warn('Failed to load inventory from backend, falling back to empty.', err);
+      INVENTORY = [];
+    }
+  }
+
+  // Initial queue & volunteers load
+  if (window.api && typeof window.api.getQueue === 'function') {
+    try {
+      const resp = await window.api.getQueue();
+      QUEUE = resp.queue || resp.queue || [];
+    } catch (err) {
+      console.warn('Failed to load queue from backend.', err);
+      QUEUE = [];
+    }
+  }
+  if (window.api && typeof window.api.getVolunteers === 'function') {
+    try {
+      const resp = await window.api.getVolunteers();
+      VOLUNTEERS = resp.volunteers || [];
+    } catch (err) {
+      console.warn('Failed to load volunteers from backend.', err);
+      VOLUNTEERS = [];
+    }
+  }
+
+  selectedTaskId = null;
+
   renderInventory();
   renderTasks();
   renderAiPanel();
-  setInterval(tickTimers, 1000);
-});
+
+  // Periodic polling for live data
+  if (window.api && typeof window.api.getQueue === 'function') {
+    setInterval(async () => {
+      try {
+        const resp = await window.api.getQueue();
+        const newQueue = resp.queue || [];
+        // Maintain timers only for active (non-resolved) requests
+        const activeIds = newQueue.filter(r => r.status !== 'RESOLVED').map(r => r.request_id);
+        Object.keys(REQUEST_TIMERS).forEach(id => {
+          if (!activeIds.includes(id)) {
+            delete REQUEST_TIMERS[id];
+          }
+        });
+        QUEUE = newQueue;
+        renderTasks();
+      } catch (err) {
+        console.warn('Queue polling failed', err);
+      }
+    }, DL_CONFIG.polling.queueMs);
+  }
+
+  if (window.api && typeof window.api.getVolunteers === 'function') {
+    setInterval(async () => {
+      try {
+        const resp = await window.api.getVolunteers();
+        VOLUNTEERS = resp.volunteers || [];
+      } catch (err) {
+        console.warn('Volunteer polling failed', err);
+      }
+    }, DL_CONFIG.polling.volunteersMs);
+  }
+
+  // Timer tick interval uses configurable polling
+  setInterval(tickTimers, DL_CONFIG.polling.timersMs);
+}
+
+document.addEventListener('DOMContentLoaded', bootstrapApp);

@@ -15,7 +15,15 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 # Import all route handlers
-from routers import pipeline, approve, queue, volunteers, volunteer_return, inventory
+from routers import (
+    pipeline,
+    approve,
+    queue,
+    volunteers,
+    volunteer_return,
+    inventory,
+    settings,
+)
 
 # Import core components
 from core.escalation_scheduler import start_scheduler
@@ -49,12 +57,13 @@ app.add_middleware(
 
 # ── Route Registration ────────────────────────────────────────────────────────
 # Register all API endpoint routers with the main application
-app.include_router(pipeline.router)        # Main triage pipeline (speech/text → assessment)
+app.include_router(pipeline.router)         # Main triage pipeline (speech/text → assessment)
 app.include_router(approve.router)          # Approve/reject triage results
 app.include_router(queue.router)            # View and manage request queue
 app.include_router(volunteers.router)       # Volunteer status and assignment
 app.include_router(volunteer_return.router) # Process volunteer returns
 app.include_router(inventory.router)        # Inventory management
+app.include_router(settings.router)         # Frontend configuration
 
 
 # ── Startup Event Handler ─────────────────────────────────────────────────────

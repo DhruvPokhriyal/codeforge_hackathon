@@ -55,10 +55,8 @@
 
       <div class="section-label">UPLOAD AUDIO</div>
       <div class="upload-zone" id="upload-zone">
-        <input type="file" id="audio-file" accept=".mp3,.wav" />
-        <div class="upload-label" id="upload-label">
-          Click to upload<br />or drag &amp; drop
-        </div>
+        <input type="file" id="audio-file" />
+        <div class="upload-label" id="upload-label"></div>
       </div>
       <button class="btn btn-process" id="btn-process">PROCESS MEMO</button>
       <div class="process-status hidden" id="process-status">&#x23F3; Denoising &amp; Transcribing...</div>
@@ -70,7 +68,7 @@
 
       <div class="queue-header-row">
         <div class="queue-title">PRIORITY QUEUE</div>
-        <div class="queue-count">Active incidents: <span id="incident-count">3</span></div>
+        <div class="queue-count">Active incidents: <span id="incident-count">0</span></div>
       </div>
       <hr class="divider" />
 
