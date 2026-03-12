@@ -3,11 +3,13 @@
 # Bound ONLY to 127.0.0.1 — this API is not accessible from the network.
 #
 # Startup sequence:
-#   1. Build LlamaIndex vector store from data/protocols/
+#   1. Build LlamaIndex vector store from data/protocols/ (skipped if no PDFs)
 #   2. Start APScheduler escalation job (every 60s)
 #
 # All models (Whisper, LLaMA) are loaded lazily on first pipeline request
 # to keep startup time fast for the Electron health-check poll.
+
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -26,6 +28,7 @@ from agents.retrieval_agent import build_index
 from config import API_HOST, API_PORT, PROTOCOLS_DIR
 
 # ── FastAPI Application Initialization ─────────────────────────────────────────
+
 
 app = FastAPI(
     title="Offline Emergency Intelligence Hub",
@@ -86,6 +89,7 @@ async def on_startup():
 
 
 # ── Health Check Endpoint ─────────────────────────────────────────────────────
+
 @app.get("/health")
 async def health():
     """

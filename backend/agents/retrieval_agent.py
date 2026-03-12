@@ -37,10 +37,11 @@ def build_index(pdf_dir: str = str(PROTOCOLS_DIR)) -> None:
 def retrieve(query: str, top_k: int = RAG_TOP_K) -> dict:
     """
     Embed query → semantic search → return top-k chunks with confidence flag.
-    Raises RuntimeError if build_index() has not been called first.
+    If no index is built (no PDFs loaded), returns empty chunks with is_vague=True
+    so the pipeline degrades gracefully through the vagueness resolver.
     """
     if _index is None:
-        raise RuntimeError("Vector index not built. Call build_index() on startup.")
+        return {"chunks": [], "is_vague": True, "top_score": 0.0}
 
     retriever = _index.as_retriever(similarity_top_k=top_k)
     nodes = retriever.retrieve(query)

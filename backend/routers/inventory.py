@@ -5,10 +5,9 @@
 from fastapi import APIRouter
 
 from schemas import InventoryRefillRequest
-from utils.inventory_manager import InventoryManager
+from core import inventory as _inventory
 
 router = APIRouter()
-_inventory = InventoryManager()
 
 
 @router.get("/inventory")

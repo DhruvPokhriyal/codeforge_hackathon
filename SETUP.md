@@ -64,7 +64,7 @@ brew install ffmpeg
 
 ```bash
 git clone https://github.com/your-team/emergency-hub.git
-cd emergency-hub
+cd emergency-hub/backend
 
 python -m venv venv
 source venv/bin/activate       # Windows: venv\Scripts\activate
@@ -77,44 +77,19 @@ which python                   # confirm venv active
 
 ### Full requirements.txt
 
-```txt
-# Audio denoising
-noisereduce==3.0.2
-denoiser==0.1.5
-torchaudio==2.3.1
-torch==2.3.1
-scipy==1.13.1
-sounddevice==0.4.7
-numpy==1.26.4
+See `backend/requirements.txt` for the pinned dependency list (kept in sync with the active venv).
 
-# Speech to text
-openai-whisper==20231117
+Key install notes:
+- **torch** must be the CPU-only build: `pip install torch --index-url https://download.pytorch.org/whl/cpu`
+- **llama-cpp-python** prebuilt CPU wheels: `pip install llama-cpp-python --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cpu`
+- **ffmpeg** is a **system package** required by Whisper (not installable via pip)
 
-# LLM inference (CPU)
-llama-cpp-python==0.2.90
-
-# RAG — retrieval + embeddings
-llama-index==0.10.68
-llama-index-embeddings-huggingface==0.2.3
-sentence-transformers==3.0.1
-
-# Data + fuzzy matching
-pandas==2.2.2
-rapidfuzz==3.9.7
-
-# Background task scheduling (escalation)
-APScheduler==3.10.4
-
-# Backend server
-fastapi==0.111.0
-uvicorn==0.30.1
-
-# Model download utility
-huggingface-hub==0.23.4
-```
-
-### Install
 ```bash
+# Ubuntu — install ffmpeg first
+sudo apt install -y ffmpeg
+
+pip install torch --index-url https://download.pytorch.org/whl/cpu
+pip install llama-cpp-python --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cpu
 pip install -r requirements.txt
 ```
 
@@ -125,13 +100,11 @@ pip install -r requirements.txt
 python -c "import whisper; print('whisper ✅')"
 python -c "from llama_cpp import Llama; print('llama-cpp ✅')"
 python -c "import noisereduce; print('noisereduce ✅')"
-python -c "import denoiser; print('facebook denoiser ✅')"
 python -c "import fastapi; print('fastapi ✅')"
 python -c "from llama_index.core import VectorStoreIndex; print('llama-index ✅')"
 python -c "from apscheduler.schedulers.background import BackgroundScheduler; print('APScheduler ✅')"
+ffmpeg -version 2>&1 | head -1   # system check
 ```
-
-All seven should print ✅.
 
 ---
 

@@ -12,11 +12,10 @@
 from fastapi import APIRouter, HTTPException
 
 from schemas import ApproveRequest, ApproveResponse
-from core import priority_queue, request_store, dispatch, VOLUNTEERS
-from utils.inventory_manager import InventoryManager
+from core import priority_queue, request_store, dispatch, VOLUNTEERS, inventory as _inventory
+
 
 router = APIRouter()
-_inventory = InventoryManager()
 
 
 @router.post("/approve", response_model=ApproveResponse)
