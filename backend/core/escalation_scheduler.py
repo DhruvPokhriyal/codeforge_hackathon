@@ -8,7 +8,6 @@
 # Public interface:
 #   start_scheduler(queue) -> None   — call once in FastAPI startup event
 
-import math
 from datetime import datetime
 
 from apscheduler.schedulers.background import BackgroundScheduler

@@ -1,328 +1,834 @@
 // frontend/app.js
-// All UI logic for the Emergency Intelligence Hub renderer.
-//
-// Responsibilities:
-//   · Audio file upload → base64 encoding → POST /pipeline
-//   · HITL report rendering: situation cards, materials checklist, source chunks
-//   · Situation selection + manual override → POST /approve
-//   · Live countdown timers per volunteer (updates every second)
-//   · "Back at Base" button → return popup → POST /volunteer/return
-//   · 3-second polling: GET /queue, /volunteers, /inventory
-//
-// All HTTP calls go through window.api (defined in electron/preload.js).
-// This file has zero direct Node / Electron / fetch dependencies.
-
+// Digital Lifeboat — All renderer UI logic (Electron renderer).
 "use strict";
 
-// ── State ─────────────────────────────────────────────────────────────────────
-let currentRequestId = null;
-let currentSituations = [];
-let selectedIndices = new Set();
-let pollingInterval = null;
-let timerInterval = null;
+// ── Config & State ─────────────────────────────────────────────────────────────
 
-// ── DOM refs ──────────────────────────────────────────────────────────────────
-const audioFileInput = document.getElementById("audio-file");
-const btnProcess = document.getElementById("btn-process");
-const processingStatus = document.getElementById("processing-status");
-const hitlPanel = document.getElementById("hitl-panel");
-const reportRequestId = document.getElementById("report-request-id");
-const reportTranscript = document.getElementById("report-transcript");
-const situationCards = document.getElementById("situation-cards");
-const btnApprove = document.getElementById("btn-approve");
-const btnRefill = document.getElementById("btn-refill");
-const queueTbody = document.getElementById("queue-tbody");
-const inventoryTbody = document.getElementById("inventory-tbody");
-const volunteerCards = document.getElementById("volunteer-cards");
+const DEFAULT_CONFIG = {
+  polling: {
+    queueMs: 3000,
+    volunteersMs: 3000,
+    timersMs: 1000,
+  },
+  audio: {
+    acceptedExtensions: [".wav", ".mp3", ".flac", ".ogg", ".m4a"],
+  },
+  uiText: {
+    upload: {
+      dropHint: "Click to upload or drag & drop",
+      invalidFile: "Invalid file. Please drop a supported audio file.",
+      noFileSelected: "Please select an audio file first.",
+    },
+    processing: {
+      starting: "⏳ Denoising audio...",
+      steps: [
+        "⏳ Transcribing speech...",
+        "⏳ Running triage analysis...",
+        "⏳ Allocating resources...",
+      ],
+      done: "✓ Processing complete.",
+    },
+  },
+};
 
-// ── Audio processing ──────────────────────────────────────────────────────────
-btnProcess.addEventListener("click", async () => {
-    const file = audioFileInput.files[0];
-    if (!file) {
-        setStatus("Please select an audio file first.");
-        return;
-    }
+// Live configuration (overridden by backend /settings/frontend if available)
+let DL_CONFIG = { ...DEFAULT_CONFIG };
 
-    setStatus("Encoding audio...");
-    btnProcess.disabled = true;
+// Live data — populated from backend.
+let INVENTORY = [];
+let QUEUE = [];
+let VOLUNTEERS = [];
 
-    const audio_b64 = await fileToBase64(file);
-    setStatus("Processing pipeline (this may take 30–60s)...");
+// Latest unapproved pipeline response (for HITL panel)
+let CURRENT_PIPELINE = null;
 
-    try {
-        const result = await window.api.runPipeline(audio_b64);
-        currentRequestId = result.request_id;
-        currentSituations = result.situations;
-        selectedIndices.clear();
+// Local per-request timers (seconds since assignment) keyed by request_id
+const REQUEST_TIMERS = {};
 
-        reportRequestId.textContent = `Request: ${result.request_id}`;
-        reportTranscript.textContent = `"${result.transcript}"`;
-        renderHITLReport(result.situations, result.is_vague);
-
-        hitlPanel.classList.remove("hidden");
-        setStatus("");
-    } catch (err) {
-        setStatus(`Error: ${err.message}`);
-    } finally {
-        btnProcess.disabled = false;
-    }
-});
-
-function fileToBase64(file) {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result.split(",")[1]);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-    });
-}
-
-// ── HITL report rendering ─────────────────────────────────────────────────────
-function renderHITLReport(situations, isVague) {
-    situationCards.innerHTML = "";
-
-    if (isVague) {
-        const banner = document.createElement("div");
-        banner.className = "status-text";
-        banner.textContent =
-            "⚠ Vague transcript — expanded with LLM hypotheses";
-        situationCards.appendChild(banner);
-    }
-
-    situations.forEach((sit, i) => {
-        const card = document.createElement("div");
-        card.className = `situation-card severity-${sit.severity.toLowerCase()}`;
-        card.dataset.index = i;
-        card.innerHTML = `
-      <h3>${sit.label}
-        <span class="badge badge-${sit.severity.toLowerCase()}">${sit.severity}</span>
-      </h3>
-      <p>Confidence: ${(sit.confidence * 100).toFixed(0)}%
-         · Travel: ${sit.travel_time_min}min
-         · Resolution: ${sit.resolution_time_min}min
-         · Key: ${sit.heap_key.toFixed(1)}</p>
-
-      <h4 style="margin-top:8px">Materials</h4>
-      <ul>
-        ${sit.materials
-            .map(
-                (m) => `
-          <li class="${m.available ? "" : "greyed-out"}">
-            ${m.available ? "☑" : "☐"} ${m.item} ×${m.quantity}
-            ${
-                m.available
-                    ? `— Bin ${m.bin} (${m.available_qty} avail.)`
-                    : "— OUT OF STOCK"
-            }
-          </li>
-        `,
-            )
-            .join("")}
-      </ul>
-
-      <details style="margin-top:8px">
-        <summary>📄 Source chunks</summary>
-        ${sit.source_chunks.map((s) => `<p class="chunk-ref">${s}</p>`).join("")}
-      </details>
-    `;
-        card.addEventListener("click", () => toggleSituation(i, card));
-        situationCards.appendChild(card);
-    });
-}
-
-function toggleSituation(index, cardEl) {
-    if (selectedIndices.has(index)) {
-        selectedIndices.delete(index);
-        cardEl.classList.remove("selected");
-    } else {
-        selectedIndices.add(index);
-        cardEl.classList.add("selected");
-    }
-}
-
-// ── Approve & dispatch ────────────────────────────────────────────────────────
-btnApprove.addEventListener("click", async () => {
-    if (selectedIndices.size === 0) {
-        alert("Please select at least one situation before approving.");
-        return;
-    }
-
-    const conditionInput = document
-        .getElementById("manual-condition")
-        .value.trim();
-    const itemsInput = document.getElementById("manual-items").value.trim();
-    const manualOverride = conditionInput
-        ? {
-              condition: conditionInput,
-              items: itemsInput
-                  .split(",")
-                  .map((s) => s.trim())
-                  .filter(Boolean),
-          }
-        : null;
-
-    btnApprove.disabled = true;
-    try {
-        await window.api.approveReport(
-            currentRequestId,
-            Array.from(selectedIndices),
-            manualOverride,
-        );
-        hitlPanel.classList.add("hidden");
-        refreshAll();
-    } catch (err) {
-        alert(`Approve failed: ${err.message}`);
-    } finally {
-        btnApprove.disabled = false;
-    }
-});
-
-// ── Queue rendering ───────────────────────────────────────────────────────────
-function renderQueue(queue) {
-    queueTbody.innerHTML = queue
-        .map(
-            (req) => `
-    <tr>
-      <td>${req.request_id}</td>
-      <td>${req.situations?.[0]?.severity ?? "—"}</td>
-      <td>${req.status}</td>
-      <td>${req.assigned_volunteer ?? "—"}</td>
-      <td>${req.heap_key?.toFixed(1) ?? "—"}</td>
-    </tr>
-  `,
-        )
-        .join("");
-}
-
-// ── Volunteer rendering ───────────────────────────────────────────────────────
-function renderVolunteers(volunteers) {
-    volunteerCards.innerHTML = volunteers
-        .map((vol) => {
-            const statusClass = `vol-status-${vol.status.toLowerCase()}`;
-            const countdown = vol.expected_return
-                ? computeCountdown(vol.expected_return)
-                : null;
-            const timerHtml =
-                countdown !== null
-                    ? `<span class="vol-timer ${countdown < 0 ? "overdue" : ""}">${formatCountdown(countdown)}</span>`
-                    : "";
-            const returnBtn =
-                vol.status === "BUSY"
-                    ? `<button class="btn btn--secondary" onclick="showReturnModal('${vol.volunteer_id}')">Back at Base</button>`
-                    : "";
-            return `
-      <div class="volunteer-card">
-        <span class="vol-id">${vol.volunteer_id}</span>
-        <span class="vol-status ${statusClass}">${vol.status}</span>
-        <span style="font-size:11px;color:var(--text-muted)">
-          ${vol.request_id ? `→ ${vol.request_id}` : ""}
-        </span>
-        ${timerHtml}
-        ${returnBtn}
-      </div>
-    `;
-        })
-        .join("");
-}
-
-// ── Inventory rendering ───────────────────────────────────────────────────────
-function renderInventory(inventory) {
-    inventoryTbody.innerHTML = inventory
-        .map((item) => {
-            const lowStock = item.Available === 0 ? "greyed-out" : "";
-            return `
-      <tr class="${lowStock}">
-        <td>${item.Item}</td>
-        <td>${item.Available}</td>
-        <td>${item.Reserved}</td>
-        <td>${item.Total}</td>
-        <td>${item["Bin Location"] ?? "—"}</td>
-      </tr>
-    `;
-        })
-        .join("");
-}
-
-// ── Volunteer return modal ────────────────────────────────────────────────────
-function showReturnModal(volunteerId) {
-    const items = prompt(
-        `${volunteerId}: Enter returned items (comma-separated)`,
-        "",
-    );
-    if (items === null) return;
-    const returnedItems = items
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean)
-        .map((item) => ({ item, quantity: 1 }));
-
-    window.api
-        .volunteerReturn(volunteerId, returnedItems)
-        .then(() => refreshAll())
-        .catch((err) => alert(`Return failed: ${err.message}`));
-}
-
-// ── Timer helpers ─────────────────────────────────────────────────────────────
-function computeCountdown(expectedReturn) {
-    // expectedReturn is "HH:MM:SS" (today's date assumed)
-    const [h, m, s] = expectedReturn.split(":").map(Number);
-    const now = new Date();
-    const target = new Date(now);
-    target.setHours(h, m, s, 0);
-    return Math.floor((target - now) / 1000); // seconds remaining (negative = overdue)
-}
-
-function formatCountdown(seconds) {
-    const absS = Math.abs(seconds);
-    const mm = String(Math.floor(absS / 60)).padStart(2, "0");
-    const ss = String(absS % 60).padStart(2, "0");
-    return seconds < 0 ? `-${mm}:${ss}` : `${mm}:${ss}`;
-}
-
-// ── Polling & refresh ─────────────────────────────────────────────────────────
-async function refreshAll() {
-    try {
-        const [queueRes, volRes, invRes] = await Promise.all([
-            window.api.getQueue(),
-            window.api.getVolunteers(),
-            window.api.getInventory(),
-        ]);
-        renderQueue(queueRes.queue ?? []);
-        renderVolunteers(volRes.volunteers ?? []);
-        renderInventory(invRes.inventory ?? []);
-    } catch (_) {
-        /* backend may not be ready yet */
-    }
-}
-
-function startPolling() {
-    refreshAll();
-    pollingInterval = setInterval(refreshAll, 3000);
-    // Re-render volunteer timers every second for countdown display
-    timerInterval = setInterval(() => {
-        window.api
-            .getVolunteers()
-            .then((r) => renderVolunteers(r.volunteers ?? []))
-            .catch(() => {});
-    }, 1000);
-}
-
-// ── Inventory refill ──────────────────────────────────────────────────────────
-btnRefill.addEventListener("click", async () => {
-    await fetch("http://127.0.0.1:8000/inventory/refill", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mode: "partial" }),
-    });
-    refreshAll();
-});
+// ── State ──────────────────────────────────────────────────────────────────────
+let activeTaskId = null;      // request currently in "Returned" modal
+let selectedTaskId = null;    // request selected in queue panel
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-function setStatus(msg) {
-    processingStatus.textContent = msg;
+function formatTimer(s) {
+  const m = Math.floor(s / 60);
+  const sec = s % 60;
+  return `${m}:${String(sec).padStart(2, '0')}`;
 }
 
-// ── Initialise ────────────────────────────────────────────────────────────────
-document.addEventListener("DOMContentLoaded", () => {
-    startPolling();
+// ── Theme Switcher ──────────────────────────────────────────────────────────────
+(function initTheme() {
+  const saved = localStorage.getItem('dl-theme') || 'light';
+  document.documentElement.setAttribute('data-theme', saved);
+
+  document.querySelectorAll('.theme-btn').forEach(btn => {
+    if (btn.dataset.theme === saved) btn.classList.add('active');
+
+    btn.addEventListener('click', () => {
+      const theme = btn.dataset.theme;
+      document.documentElement.setAttribute('data-theme', theme);
+      document.querySelectorAll('.theme-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      localStorage.setItem('dl-theme', theme);
+    });
+  });
+})();
+
+// ── Render: Inventory ──────────────────────────────────────────────────────────
+function renderInventory() {
+  const el = document.getElementById('inventory-list');
+  el.innerHTML = INVENTORY.map(item => {
+    const available = item.Available ?? item.qty ?? 0;
+    const total = item.Total ?? item.total ?? 0;
+    const pct     = total > 0 ? Math.round((available / total) * 100) : 0;
+    const isCrit  = pct < 20;
+    const countCls = isCrit ? 'inv-count critical-text' : 'inv-count';
+    return `
+      <div class="inv-item">
+        <div class="inv-item-header">
+          <span class="inv-name">${item.Item ?? item.name}</span>
+          <span class="${countCls}">${available}/${total}</span>
+        </div>
+        <div class="inv-bar-track">
+          <div class="inv-bar-fill${isCrit ? ' inv-bar-low' : ''}" style="width:${pct}%"></div>
+        </div>
+        <div class="inv-pct-row">
+          <span class="inv-pct">${pct}%</span>
+          ${isCrit ? '<span class="critical-low-label">CRITICAL LOW</span>' : ''}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+// ── Render: Task Cards ─────────────────────────────────────────────────────────
+function renderTasks() {
+  const el = document.getElementById('task-list');
+  const active = QUEUE.filter(t => t.status !== 'RESOLVED');
+  document.getElementById('incident-count').textContent = active.length;
+
+  el.innerHTML = active.map(task => {
+    const p           = (task.priority || task.severity || 'HIGH').toString().toLowerCase();
+    const status      = task.status || 'PENDING';
+    const stateClass  = status === 'IN_PROGRESS' || status === 'ASSIGNED' ? 'in-progress' : 'pending';
+    const statusLabel = stateClass === 'in-progress' ? (status || 'IN PROGRESS') : 'PENDING';
+    const escalIcon   = task.escalated
+      ? '<span class="escalated-icon" title="Priority escalated">&#x26A0;</span>'
+      : '';
+    const hasVolunteer = !!(task.assigned_volunteer);
+    const completeBtn = hasVolunteer
+      ? `<button class="btn btn-complete" data-id="${task.request_id}">BACK AT BASE</button>`
+      : '';
+    const volunteerId = task.volunteer || task.assigned_volunteer;
+    const volunteerLine = volunteerId
+      ? `<div class="card-volunteer">&#x1F464; ${volunteerId}</div>`
+      : '';
+    const timerSec = REQUEST_TIMERS[task.request_id] ?? 0;
+    const timer    = formatTimer(timerSec);
+    const timerCls = timerSec > 600 ? 'card-timer overdue' : 'card-timer';
+    const selCls   = task.request_id === selectedTaskId ? ' card-selected' : '';
+
+    return `
+      <div class="task-card priority-${p} ${stateClass}${selCls}" data-task-id="${task.request_id}">
+        <div class="card-top">
+          <div class="card-badges">
+            <span class="priority-badge badge-${p}">[${task.priority || task.severity}]</span>
+            ${escalIcon}
+            <span class="status-badge status-${stateClass}">${statusLabel}</span>
+          </div>
+          <span class="${timerCls}">T-${timer}</span>
+        </div>
+        <div class="card-title">${task.title}</div>
+        ${volunteerLine}
+        <div class="card-footer">
+          <div class="card-location">&#x1F4CD; ${task.location}</div>
+          ${completeBtn}
+        </div>
+      </div>`;
+  }).join('');
+
+  // Card click -> select and populate AI panel
+  el.querySelectorAll('.task-card').forEach(card => {
+    card.addEventListener('click', () => {
+      selectedTaskId = card.dataset.taskId;
+      el.querySelectorAll('.task-card').forEach(c => c.classList.remove('card-selected'));
+      card.classList.add('card-selected');
+      renderAiPanel();
+    });
+  });
+
+  // COMPLETE button — stop click from bubbling to card
+  el.querySelectorAll('.btn-complete').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      openCompleteModal(btn.dataset.id);
+    });
+  });
+}
+
+// ── Render: AI Review Panel (Human-in-the-Loop) ───────────────────────────────
+function renderAiPanel() {
+  const content = document.getElementById('ai-panel-content');
+  if (!content) return;
+
+  // If there is a fresh pipeline result waiting for approval, prioritise showing that
+  if (CURRENT_PIPELINE) {
+    const sit = CURRENT_PIPELINE.situations?.[0];
+    if (!sit) {
+      content.innerHTML = '<div class="ai-no-selection">No situations returned from pipeline.</div>';
+      return;
+    }
+    const priority = sit.severity || 'HIGH';
+    const severityCls = priority === 'CRITICAL' ? 'critical-text' : 'high-text';
+
+    const steps = sit.instructions || [];
+    const stepsHtml = steps.map((s, i) => `
+    <div class="step-row">
+      <span class="step-num">${i + 1}</span>
+      <span class="step-text">${s}</span>
+    </div>`).join('');
+
+    const sources = sit.source_chunks || [];
+    const sourcesHtml = sources.map(s => `
+    <li class="source-item">
+      <span class="source-icon">&#x1F4C4;</span>
+      <span class="source-name">${s}</span>
+    </li>`).join('');
+
+    const items = (sit.materials || []).map(m => ({
+      name: m.item,
+      qty: m.quantity,
+    }));
+    const itemsHtml = items.map(item => {
+      const inv   = INVENTORY.find(i => (i.Item ?? i.name) === item.name);
+      const avail = inv ? (inv.Available ?? inv.qty) : '?';
+      const total = inv ? (inv.Total ?? inv.total) : '?';
+      const pct   = (inv && inv.Total > 0) ? (inv.Available / inv.Total) * 100 : 100;
+      const cls   = pct >= 80 ? 'green-text' : pct >= 40 ? 'orange-text' : 'critical-text';
+      return `
+      <div class="material-row">
+        <span class="material-name">${item.name} &times;${item.qty}</span>
+        <span class="material-qty ${cls}">${avail}/${total}</span>
+      </div>`;
+    }).join('');
+
+    content.innerHTML = `
+    <div class="ai-task-id">${CURRENT_PIPELINE.request_id}</div>
+    <div class="ai-task-title">${sit.label || 'Emergency Request'}</div>
+    <div class="ai-meta-chips">
+      <span class="ai-chip ${severityCls}">${priority}</span>
+      <span class="ai-chip">&#x23F1; ~${sit.resolution_time_min ?? '?'} min</span>
+    </div>
+    <hr class="divider" />
+
+    <div class="ai-section-label">TRANSCRIPT</div>
+    <div class="ai-transcript">${CURRENT_PIPELINE.transcript}</div>
+    <hr class="divider" />
+
+    <div class="ai-section-label">STEPS TO TAKE</div>
+    <div class="steps-list">${stepsHtml}</div>
+    <hr class="divider" />
+
+    <div class="ai-section-label">SOURCES</div>
+    <ul class="sources-list">${sourcesHtml}</ul>
+    <hr class="divider" />
+
+    <div class="ai-section-label">REQUIRED MATERIALS</div>
+    <div class="materials-list">${itemsHtml}</div>
+    `;
+    return;
+  }
+
+  if (!selectedTaskId) {
+    content.innerHTML = '<div class="ai-no-selection">&#x25B6;&nbsp; Select a task to view AI analysis</div>';
+    return;
+  }
+
+  const task = QUEUE.find(t => t.request_id === selectedTaskId);
+  if (!task) return;
+
+  const priority = task.priority || task.severity || 'HIGH';
+  const severityCls = priority === 'CRITICAL' ? 'critical-text' : 'high-text';
+
+  const steps = task.steps || task.instructions || [];
+  const stepsHtml = steps.map((s, i) => `
+    <div class="step-row">
+      <span class="step-num">${i + 1}</span>
+      <span class="step-text">${s}</span>
+    </div>`).join('');
+
+  const handoff = task.handoff || task.handoff_logs || [];
+  const handoffHtml = handoff.map((entry, i) => {
+    const isLast = i === task.handoff.length - 1;
+    return `
+      <div class="handoff-entry">
+        <div class="handoff-dot${entry.done ? ' done' : ''}"></div>
+        ${!isLast ? '<div class="handoff-line"></div>' : '<div></div>'}
+        <div class="handoff-content">
+          <div class="handoff-agent">${entry.agent || entry.step || 'Agent'}</div>
+          <div class="handoff-time">${entry.time || ''}</div>
+          <div class="handoff-note">${entry.note || entry.reason || ''}</div>
+        </div>
+      </div>`;
+  }).join('');
+
+  const sources = task.sources || task.source_chunks || [];
+  const sourcesHtml = sources.map(s => `
+    <li class="source-item">
+      <span class="source-icon">&#x1F4C4;</span>
+      <span class="source-name">${s}</span>
+    </li>`).join('');
+
+  const items = task.items || (task.materials || []).map(m => ({
+    name: m.item,
+    qty: m.quantity,
+  }));
+  const itemsHtml = items.map(item => {
+    const inv   = INVENTORY.find(i => (i.Item ?? i.name) === item.name);
+    const avail = inv ? (inv.Available ?? inv.qty) : '?';
+    const total = inv ? (inv.Total ?? inv.total) : '?';
+    const baseAvail = inv ? (inv.Available ?? inv.qty) : 0;
+    const baseTotal = inv ? (inv.Total ?? inv.total) : 0;
+    const pct   = baseTotal > 0 ? (baseAvail / baseTotal) * 100 : 100;
+    const cls   = pct >= 80 ? 'green-text' : pct >= 40 ? 'orange-text' : 'critical-text';
+    return `
+      <div class="material-row">
+        <span class="material-name">${item.name} &times;${item.qty}</span>
+        <span class="material-qty ${cls}">${avail}/${total}</span>
+      </div>`;
+  }).join('');
+
+  content.innerHTML = `
+    <div class="ai-task-id">${task.id || task.request_id}</div>
+    <div class="ai-task-title">${task.title || (task.situations && task.situations[0]?.label) || 'Emergency Request'}</div>
+    <div class="ai-meta-chips">
+      <span class="ai-chip ${severityCls}">${priority}</span>
+      <span class="ai-chip">&#x23F1; ~${task.estTimeMins ?? (task.situations?.[0]?.resolution_time_min ?? '?')} min</span>
+      <span class="ai-chip">&#x1F465; ${task.estVictims ?? ''}</span>
+    </div>
+    <hr class="divider" />
+
+    <div class="ai-section-label">TRANSCRIPT</div>
+    <div class="ai-transcript">${task.transcript}</div>
+    <hr class="divider" />
+
+    <div class="ai-section-label">STEPS TO TAKE</div>
+    <div class="steps-list">${stepsHtml}</div>
+    <hr class="divider" />
+
+    <div class="ai-section-label">AGENT HANDOFF</div>
+    <div class="handoff-timeline">${handoffHtml}</div>
+    <hr class="divider" />
+
+    <div class="ai-section-label">SOURCES</div>
+    <ul class="sources-list">${sourcesHtml}</ul>
+    <hr class="divider" />
+
+    <div class="ai-section-label">REQUIRED MATERIALS</div>
+    <div class="materials-list">${itemsHtml}</div>
+  `;
+}
+
+// ── Countdown Timers ──────────────────────────────────────────────────────────
+function tickTimers() {
+  QUEUE.forEach(task => {
+    if (task.status !== 'ASSIGNED') return;
+    const id = task.request_id;
+    REQUEST_TIMERS[id] = (REQUEST_TIMERS[id] ?? 0) + 1;
+    const card = document.querySelector(`.task-card[data-task-id="${id}"]`);
+    if (card) {
+      const timerEl = card.querySelector('.card-timer');
+      if (timerEl) {
+        const secs = REQUEST_TIMERS[id];
+        timerEl.textContent = `T-${formatTimer(secs)}`;
+        if (secs > 600) timerEl.classList.add('overdue');
+      }
+    }
+  });
+}
+
+// ── Upload Zone ────────────────────────────────────────────────────────────────
+(function initUpload() {
+  const zone        = document.getElementById('upload-zone');
+  const fileInput   = document.getElementById('audio-file');
+  const uploadLabel = document.getElementById('upload-label');
+
+  // Apply configured accepted extensions to the file input
+  if (fileInput && DL_CONFIG.audio?.acceptedExtensions) {
+    fileInput.accept = DL_CONFIG.audio.acceptedExtensions.join(',');
+  }
+
+  if (uploadLabel && DL_CONFIG.uiText?.upload?.dropHint) {
+    uploadLabel.innerHTML = DL_CONFIG.uiText.upload.dropHint.replace(/\n/g, '<br>');
+  }
+
+  zone.addEventListener('dragover', e => {
+    e.preventDefault();
+    zone.classList.add('dragging');
+  });
+  zone.addEventListener('dragleave', () => zone.classList.remove('dragging'));
+  zone.addEventListener('drop', e => {
+    e.preventDefault();
+    zone.classList.remove('dragging');
+    const f = e.dataTransfer.files[0];
+    const exts = DL_CONFIG.audio.acceptedExtensions || [];
+    const re = new RegExp(`\\.(${exts.map(x => x.replace('.', '')).join('|')})$`, 'i');
+    if (f && re.test(f.name)) {
+      uploadLabel.textContent = f.name;
+      zone.classList.add('has-file');
+    } else {
+      const msg = DL_CONFIG.uiText.upload.invalidFile || 'Invalid file.';
+      uploadLabel.innerHTML = msg.replace(/\n/g, '<br>');
+    }
+  });
+
+  fileInput.addEventListener('change', e => {
+    const f = e.target.files[0];
+    if (f) {
+      uploadLabel.textContent = f.name;
+      zone.classList.add('has-file');
+    }
+  });
+})();
+
+// ── Process Memo Button ────────────────────────────────────────────────────────
+(function initProcessBtn() {
+  const btn     = document.getElementById('btn-process');
+  const status  = document.getElementById('process-status');
+  const waveform = document.getElementById('waveform');
+  const zone    = document.getElementById('upload-zone');
+  const fileInput = document.getElementById('audio-file');
+
+  btn.addEventListener('click', () => {
+    if (!zone.classList.contains('has-file') || !fileInput || !fileInput.files[0]) {
+      const msg = DL_CONFIG.uiText.upload.noFileSelected || 'Please select an audio file first.';
+      if (status) {
+        status.classList.remove('hidden', 'text-success');
+        status.textContent = msg;
+      }
+      zone.classList.add('zone-shake');
+      setTimeout(() => zone.classList.remove('zone-shake'), 600);
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'PROCESSING...';
+    status.classList.remove('hidden', 'text-success');
+    status.textContent = DL_CONFIG.uiText.processing.starting;
+    waveform.classList.add('active');
+
+    const steps = DL_CONFIG.uiText.processing.steps || [];
+    const stepDelay = 1600;
+    steps.forEach((msg, idx) => {
+      setTimeout(() => { status.textContent = msg; }, stepDelay * (idx + 1));
+    });
+
+    // If backend API is available, send the audio as base64
+    const file = fileInput.files[0];
+    if (window.api && typeof window.api.runPipeline === 'function' && file) {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const buffer = e.target.result;
+          const bytes = new Uint8Array(buffer);
+          let binary = "";
+          for (let i = 0; i < bytes.byteLength; i++) {
+            binary += String.fromCharCode(bytes[i]);
+          }
+          const audioB64 = btoa(binary);
+          const resp = await window.api.runPipeline(audioB64);
+
+          // Hold the latest pipeline result for HITL approval in the AI panel
+          CURRENT_PIPELINE = resp;
+          selectedTaskId = null;
+          renderAiPanel();
+
+          status.textContent = DL_CONFIG.uiText.processing.done;
+          status.classList.add('text-success');
+        } catch (err) {
+          console.error('Pipeline error', err);
+          status.textContent = 'Pipeline error. See console.';
+        } finally {
+          btn.disabled = false;
+          btn.textContent = 'PROCESS MEMO';
+          waveform.classList.remove('active');
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    } else {
+      // Fallback: no backend available, just complete after a delay
+      setTimeout(() => {
+        status.textContent = DL_CONFIG.uiText.processing.done;
+        status.classList.add('text-success');
+        btn.disabled = false;
+        btn.textContent = 'PROCESS MEMO';
+        waveform.classList.remove('active');
+      }, stepDelay * ((DL_CONFIG.uiText.processing.steps || []).length + 2));
+    }
+  });
+})();
+
+// ── AI Panel: Approve ─────────────────────────────────────────────────────────
+(function initApprove() {
+  const btnApprove = document.getElementById('btn-approve');
+  btnApprove.addEventListener('click', () => {
+    if (!window.api || typeof window.api.approveReport !== 'function') return;
+    if (!CURRENT_PIPELINE) return;
+
+    btnApprove.disabled = true;
+    btnApprove.textContent = 'APPROVING...';
+
+    // For now, auto-select the top situation (index 0)
+    const selected_indices = [0];
+    const manual_override = window.__DL_PENDING_OVERRIDE || null;
+
+    window.api.approveReport(CURRENT_PIPELINE.request_id, selected_indices, manual_override)
+      .then(resp => {
+        // Update queue and volunteers from backend response
+        QUEUE = resp.queue || [];
+        VOLUNTEERS = resp.volunteers || [];
+
+        // Clear current pipeline / override
+        CURRENT_PIPELINE = null;
+        window.__DL_PENDING_OVERRIDE = null;
+
+        renderTasks();
+        renderAiPanel();
+      })
+      .catch(err => {
+        console.error('Approve error', err);
+      })
+      .finally(() => {
+        btnApprove.textContent = 'APPROVE';
+        btnApprove.disabled = false;
+      });
+  });
+})();
+
+// ── Override Modal ────────────────────────────────────────────────────────────
+function openOverrideModal() {
+  // Reset text fields
+  document.getElementById('override-situation').value = '';
+  document.getElementById('override-steps').value = '';
+
+  // Build item rows from INVENTORY using safe DOM API
+  const container = document.getElementById('override-items');
+  container.innerHTML = '';
+
+  INVENTORY.forEach(item => {
+    const row = document.createElement('div');
+    row.className = 'override-item-row';
+
+    const nameEl = document.createElement('span');
+    nameEl.className = 'override-item-name';
+    nameEl.textContent = item.Item ?? item.name;
+
+    const btnMinus = document.createElement('button');
+    btnMinus.className = 'btn btn-qty';
+    btnMinus.type = 'button';
+    btnMinus.textContent = '\u2212';  // minus sign
+
+    const qtyInput = document.createElement('input');
+    qtyInput.type = 'number';
+    qtyInput.className = 'qty-input';
+    qtyInput.value = 0;
+    qtyInput.min = 0;
+    const maxQty = item.Available ?? item.qty ?? 0;
+    qtyInput.max = maxQty;
+    qtyInput.dataset.item = item.Item ?? item.name;
+
+    const btnPlus = document.createElement('button');
+    btnPlus.className = 'btn btn-qty';
+    btnPlus.type = 'button';
+    btnPlus.textContent = '+';
+
+    const availEl = document.createElement('span');
+    availEl.className = 'override-item-avail';
+    availEl.textContent = `avail: ${maxQty}`;
+
+    btnMinus.addEventListener('click', () => {
+      qtyInput.value = Math.max(0, parseInt(qtyInput.value || 0) - 1);
+    });
+    btnPlus.addEventListener('click', () => {
+      qtyInput.value = Math.min(item.qty, parseInt(qtyInput.value || 0) + 1);
+    });
+
+    row.appendChild(nameEl);
+    row.appendChild(btnMinus);
+    row.appendChild(qtyInput);
+    row.appendChild(btnPlus);
+    row.appendChild(availEl);
+    container.appendChild(row);
+  });
+
+  document.getElementById('override-overlay').classList.remove('hidden');
+}
+
+function closeOverrideModal() {
+  document.getElementById('override-overlay').classList.add('hidden');
+}
+
+(function initOverride() {
+  document.getElementById('btn-override').addEventListener('click', openOverrideModal);
+  document.getElementById('override-cancel').addEventListener('click', closeOverrideModal);
+
+  document.getElementById('override-overlay').addEventListener('click', e => {
+    if (e.target === document.getElementById('override-overlay')) closeOverrideModal();
+  });
+
+  document.getElementById('override-submit').addEventListener('click', () => {
+    const situation = document.getElementById('override-situation').value.trim();
+    const steps     = document.getElementById('override-steps').value.trim();
+    if (!situation) {
+      document.getElementById('override-situation').focus();
+      return;
+    }
+    // Gather selected quantities (items with qty > 0)
+    const resources = [...document.querySelectorAll('.qty-input')]
+      .map(inp => ({ item: inp.dataset.item, qty: parseInt(inp.value || 0) }))
+      .filter(r => r.qty > 0);
+
+    // Store pending manual override payload to be attached on next APPROVE
+    window.__DL_PENDING_OVERRIDE = {
+      condition: situation,
+      items: resources.map(r => r.item),
+      notes: steps,
+    };
+
+    closeOverrideModal();
+  });
+})();
+
+// ── Complete & Returned Modal ──────────────────────────────────────────────────
+function openCompleteModal(taskId) {
+  const task = QUEUE.find(t => t.request_id === taskId);
+  if (!task) return;
+  activeTaskId = taskId;
+
+  const checklist = document.getElementById('modal-checklist');
+  checklist.innerHTML = '';
+
+  const items = task.items_taken || [];
+  items.forEach(item => {
+    const row = document.createElement('div');
+    row.className = 'override-item-row';  // reuse the same row style as Override modal
+
+    // Name + "taken" label
+    const nameEl = document.createElement('span');
+    nameEl.className = 'override-item-name';
+    nameEl.textContent = item.item;
+
+    const takenEl = document.createElement('span');
+    takenEl.className = 'override-item-avail';
+    takenEl.textContent = `taken: ${item.quantity}`;
+
+    const btnMinus = document.createElement('button');
+    btnMinus.className = 'btn btn-qty';
+    btnMinus.type = 'button';
+    btnMinus.textContent = '\u2212';
+
+    const qtyInput = document.createElement('input');
+    qtyInput.type = 'number';
+    qtyInput.className = 'qty-input return-qty';
+    qtyInput.value = item.quantity;   // default to full return
+    qtyInput.min = 0;
+    qtyInput.max = item.quantity;
+    qtyInput.dataset.item = item.item;
+    qtyInput.dataset.max  = item.quantity;
+
+    const btnPlus = document.createElement('button');
+    btnPlus.className = 'btn btn-qty';
+    btnPlus.type = 'button';
+    btnPlus.textContent = '+';
+
+    btnMinus.addEventListener('click', () => {
+      qtyInput.value = Math.max(0, parseInt(qtyInput.value || 0) - 1);
+      updateConfirmBtn();
+    });
+    btnPlus.addEventListener('click', () => {
+      qtyInput.value = Math.min(item.qty, parseInt(qtyInput.value || 0) + 1);
+      updateConfirmBtn();
+    });
+    qtyInput.addEventListener('input', updateConfirmBtn);
+
+    row.appendChild(nameEl);
+    row.appendChild(btnMinus);
+    row.appendChild(qtyInput);
+    row.appendChild(btnPlus);
+    row.appendChild(takenEl);
+    checklist.appendChild(row);
+  });
+
+  updateConfirmBtn();
+  document.getElementById('modal-overlay').classList.remove('hidden');
+}
+
+function updateConfirmBtn() {
+  // Enable confirm if at least one item has a return qty > 0
+  const anyReturned = [...document.querySelectorAll('.return-qty')]
+    .some(inp => parseInt(inp.value || 0) > 0);
+  document.getElementById('modal-confirm').disabled = !anyReturned;
+}
+
+function closeModal() {
+  document.getElementById('modal-overlay').classList.add('hidden');
+  activeTaskId = null;
+}
+
+document.getElementById('modal-cancel').addEventListener('click', closeModal);
+
+document.getElementById('modal-confirm').addEventListener('click', () => {
+  if (!activeTaskId) return;
+  const task = QUEUE.find(t => t.request_id === activeTaskId);
+  if (!task || !window.api || typeof window.api.volunteerReturn !== 'function') {
+    closeModal();
+    return;
+  }
+
+  const returned_items = [];
+  document.querySelectorAll('.return-qty').forEach(inp => {
+    const qty = parseInt(inp.value || 0);
+    if (qty > 0) {
+      returned_items.push({ item: inp.dataset.item, quantity: qty });
+    }
+  });
+
+  const volunteerId = task.assigned_volunteer;
+  window.api.volunteerReturn(volunteerId, returned_items)
+    .then(resp => {
+      QUEUE = resp.queue || [];
+      VOLUNTEERS = resp.volunteers || [];
+      INVENTORY = resp.inventory || INVENTORY;
+      // Drop local timer for this request
+      delete REQUEST_TIMERS[activeTaskId];
+      renderTasks();
+      renderInventory();
+      renderAiPanel();
+    })
+    .catch(err => {
+      console.error('Volunteer return error', err);
+    })
+    .finally(() => {
+      closeModal();
+    });
 });
+
+// Close modal on overlay click
+document.getElementById('modal-overlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('modal-overlay')) closeModal();
+});
+
+// Close modals on Escape key
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    closeModal();
+    closeOverrideModal();
+  }
+});
+
+// ── Initialise ────────────────────────────────────────────────────────────────
+async function bootstrapApp() {
+  // Load config from backend if available
+  if (window.api && typeof window.api.getSettings === 'function') {
+    try {
+      const settings = await window.api.getSettings();
+      DL_CONFIG = {
+        polling: {
+          queueMs: settings.polling?.queue_ms ?? DEFAULT_CONFIG.polling.queueMs,
+          volunteersMs: settings.polling?.volunteers_ms ?? DEFAULT_CONFIG.polling.volunteersMs,
+          timersMs: settings.polling?.timers_ms ?? DEFAULT_CONFIG.polling.timersMs,
+        },
+        audio: {
+          acceptedExtensions: settings.audio?.accepted_extensions ?? DEFAULT_CONFIG.audio.acceptedExtensions,
+        },
+        uiText: {
+          upload: {
+            dropHint: settings.ui_text?.upload?.drop_hint ?? DEFAULT_CONFIG.uiText.upload.dropHint,
+            invalidFile: settings.ui_text?.upload?.invalid_file ?? DEFAULT_CONFIG.uiText.upload.invalidFile,
+            noFileSelected: settings.ui_text?.upload?.no_file_selected ?? DEFAULT_CONFIG.uiText.upload.noFileSelected,
+          },
+          processing: {
+            starting: settings.ui_text?.processing?.starting ?? DEFAULT_CONFIG.uiText.processing.starting,
+            steps: settings.ui_text?.processing?.steps ?? DEFAULT_CONFIG.uiText.processing.steps,
+            done: settings.ui_text?.processing?.done ?? DEFAULT_CONFIG.uiText.processing.done,
+          },
+        },
+      };
+    } catch (err) {
+      console.warn('Failed to load settings from backend, using defaults.', err);
+    }
+  }
+
+  // Initial inventory load
+  if (window.api && typeof window.api.getInventory === 'function') {
+    try {
+      const resp = await window.api.getInventory();
+      INVENTORY = resp.inventory || [];
+    } catch (err) {
+      console.warn('Failed to load inventory from backend, falling back to empty.', err);
+      INVENTORY = [];
+    }
+  }
+
+  // Initial queue & volunteers load
+  if (window.api && typeof window.api.getQueue === 'function') {
+    try {
+      const resp = await window.api.getQueue();
+      QUEUE = resp.queue || resp.queue || [];
+    } catch (err) {
+      console.warn('Failed to load queue from backend.', err);
+      QUEUE = [];
+    }
+  }
+  if (window.api && typeof window.api.getVolunteers === 'function') {
+    try {
+      const resp = await window.api.getVolunteers();
+      VOLUNTEERS = resp.volunteers || [];
+    } catch (err) {
+      console.warn('Failed to load volunteers from backend.', err);
+      VOLUNTEERS = [];
+    }
+  }
+
+  selectedTaskId = null;
+
+  renderInventory();
+  renderTasks();
+  renderAiPanel();
+
+  // Periodic polling for live data
+  if (window.api && typeof window.api.getQueue === 'function') {
+    setInterval(async () => {
+      try {
+        const resp = await window.api.getQueue();
+        const newQueue = resp.queue || [];
+        // Maintain timers only for active (non-resolved) requests
+        const activeIds = newQueue.filter(r => r.status !== 'RESOLVED').map(r => r.request_id);
+        Object.keys(REQUEST_TIMERS).forEach(id => {
+          if (!activeIds.includes(id)) {
+            delete REQUEST_TIMERS[id];
+          }
+        });
+        QUEUE = newQueue;
+        renderTasks();
+      } catch (err) {
+        console.warn('Queue polling failed', err);
+      }
+    }, DL_CONFIG.polling.queueMs);
+  }
+
+  if (window.api && typeof window.api.getVolunteers === 'function') {
+    setInterval(async () => {
+      try {
+        const resp = await window.api.getVolunteers();
+        VOLUNTEERS = resp.volunteers || [];
+      } catch (err) {
+        console.warn('Volunteer polling failed', err);
+      }
+    }, DL_CONFIG.polling.volunteersMs);
+  }
+
+  // Timer tick interval uses configurable polling
+  setInterval(tickTimers, DL_CONFIG.polling.timersMs);
+}
+
+document.addEventListener('DOMContentLoaded', bootstrapApp);

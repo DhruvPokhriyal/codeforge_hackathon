@@ -17,7 +17,10 @@
 const { contextBridge } = require("electron");
 const http = require("http");
 
-const API_BASE = "http://127.0.0.1:8000";
+// Allow overriding the API host/port via environment for flexibility.
+const API_HOST = process.env.DL_API_HOST || "127.0.0.1";
+const API_PORT = Number(process.env.DL_API_PORT || 8000);
+const API_BASE = `http://${API_HOST}:${API_PORT}`;
 
 /**
  * Generic HTTP helper — returns a Promise<object>.
@@ -27,8 +30,8 @@ function apiCall(method, path, body = null) {
     return new Promise((resolve, reject) => {
         const payload = body ? JSON.stringify(body) : null;
         const options = {
-            hostname: "127.0.0.1",
-            port: 8000,
+            hostname: API_HOST,
+            port: API_PORT,
             path,
             method,
             headers: {
@@ -73,4 +76,5 @@ contextBridge.exposeInMainWorld("api", {
     getQueue: () => apiCall("GET", "/queue"),
     getVolunteers: () => apiCall("GET", "/volunteers"),
     getInventory: () => apiCall("GET", "/inventory"),
+    getSettings: () => apiCall("GET", "/settings/frontend"),
 });
