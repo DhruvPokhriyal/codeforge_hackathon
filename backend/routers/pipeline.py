@@ -37,11 +37,15 @@ _llm = None
 
 
 def _get_llm():
+    """Lazily load the LLaMA GGUF model. Returns None if the model file is missing."""
     global _llm
     if _llm is None:
-        from llama_cpp import Llama
         from config import LLAMA_MODEL_PATH, LLM_CONTEXT_SIZE
+        import os
 
+        if not os.path.exists(LLAMA_MODEL_PATH):
+            return None  # degrade gracefully — fallback situations will be used
+        from llama_cpp import Llama
         _llm = Llama(model_path=LLAMA_MODEL_PATH, n_ctx=LLM_CONTEXT_SIZE, verbose=False)
     return _llm
 

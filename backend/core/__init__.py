@@ -5,10 +5,16 @@
 from .priority_queue import priority_queue
 from .request_store import request_store
 from .dispatch_engine import VOLUNTEERS, dispatch, volunteer_return, get_free_volunteer
+from utils.inventory_manager import InventoryManager
+
+# Shared inventory singleton — all routers must use this instance so that
+# reserve/restore operations are visible across the full request lifecycle.
+inventory = InventoryManager()
 
 __all__ = [
     "priority_queue",
     "request_store",
+    "inventory",
     "VOLUNTEERS",
     "dispatch",
     "volunteer_return",

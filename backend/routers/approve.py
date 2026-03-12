@@ -15,10 +15,9 @@ from schemas import ApproveRequest, ApproveResponse
 from core.priority_queue import priority_queue
 from core.request_store import request_store
 from core.dispatch_engine import dispatch
-from utils.inventory_manager import InventoryManager
+from core import inventory as _inventory
 
 router = APIRouter()
-_inventory = InventoryManager()
 
 
 @router.post("/approve", response_model=ApproveResponse)

@@ -13,10 +13,9 @@ from fastapi import APIRouter, HTTPException
 from schemas import VolunteerReturnRequest, VolunteerReturnResponse
 from core.dispatch_engine import VOLUNTEERS, volunteer_return
 from core.priority_queue import priority_queue
-from utils.inventory_manager import InventoryManager
+from core import inventory as _inventory
 
 router = APIRouter()
-_inventory = InventoryManager()
 
 
 @router.post("/volunteer/return", response_model=VolunteerReturnResponse)

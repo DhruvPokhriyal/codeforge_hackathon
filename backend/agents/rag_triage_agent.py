@@ -18,6 +18,8 @@ import json
 
 from llama_cpp import Llama
 
+from config import SCALE_FACTOR
+
 RAG_TRIAGE_PROMPT = """You are an emergency medical AI at a disaster shelter.
 You have received a distress call and retrieved relevant first-aid information.
 
@@ -71,33 +73,40 @@ def compute_heap_key(
 ) -> float:
     """
     Priority key formula: higher = more urgent.
-    heap_key = severity_score - (travel_time_min × 2) - resolution_time_min
+    heap_key = severity_score × SCALE_FACTOR - (travel_time_min × 2) - resolution_time_min
+
+    SCALE_FACTOR (1000) ensures time penalties are significant but cannot
+    fully overshadow severity — a CRITICAL case always outranks a LOW one
+    regardless of travel time.
     """
-    return float(severity_score - (travel_time * 2) - resolution_time)
+    return float(severity_score * SCALE_FACTOR - (travel_time * 2) - resolution_time)
 
 
-def run_rag_triage(transcript: str, chunks: list, llm: Llama) -> list:
+def run_rag_triage(transcript: str, chunks: list, llm) -> list:
     """
     Run the RAG triage prompt and parse the multi-situation JSON response.
     Attaches heap_key, source_chunks, and selected=False to each situation.
-    Falls back to _FALLBACK_SITUATION if LLM output cannot be parsed.
+    Falls back to _FALLBACK_SITUATION if LLM is None or output cannot be parsed.
     """
-    chunks_text = "\n\n".join(
-        f"[Source: {c['source']} p.{c['page']} | Score: {c['score']:.2f}]\n{c['text']}"
-        for c in chunks[:6]
-    )
-    prompt = RAG_TRIAGE_PROMPT.format(
-        transcript=transcript,
-        chunks_text=chunks_text,
-    )
-    resp = llm(prompt, max_tokens=1200, temperature=0.15)
-    raw = resp["choices"][0]["text"].strip()
-
-    try:
-        start, end = raw.find("["), raw.rfind("]") + 1
-        situations = json.loads(raw[start:end])
-    except Exception:
+    if llm is None:
         situations = [dict(_FALLBACK_SITUATION)]
+    else:
+        chunks_text = "\n\n".join(
+            f"[Source: {c['source']} p.{c['page']} | Score: {c['score']:.2f}]\n{c['text']}"
+            for c in chunks[:6]
+        )
+        prompt = RAG_TRIAGE_PROMPT.format(
+            transcript=transcript,
+            chunks_text=chunks_text,
+        )
+        resp = llm(prompt, max_tokens=1200, temperature=0.15)
+        raw = resp["choices"][0]["text"].strip()
+
+        try:
+            start, end = raw.find("["), raw.rfind("]") + 1
+            situations = json.loads(raw[start:end])
+        except Exception:
+            situations = [dict(_FALLBACK_SITUATION)]
 
     for s in situations:
         s["heap_key"] = compute_heap_key(

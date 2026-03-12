@@ -150,7 +150,7 @@ The system must triage every incoming report, retrieve relevant protocols from P
 ### Heap Key Formula
 
 ```
-heap_key = severity_base_score
+heap_key = severity_base_score × scale_factor
            - (travel_time_minutes × 2)
            - resolution_time_minutes
            + urgency_escalation(t)
@@ -162,6 +162,8 @@ heap_key = severity_base_score
 | HIGH | 75 |
 | MEDIUM | 50 |
 | LOW | 25 |
+
+scale_factor = 1000 (to ensure time penalties are significant but don't overshadow severity)
 
 **Travel time and resolution time** are estimated by the RAG LLM per situation and penalise key (harder to reach = lower initial priority vs equally severe but reachable case). Buffer time is added at every escalation step: `buffer = f(travel_time, resolution_time)`.
 

@@ -2,7 +2,8 @@
 # Max-heap priority queue for emergency requests.
 #
 # Key formula (computed by rag_triage_agent):
-#   heap_key = severity_score - (travel_time × 2) - resolution_time
+#   heap_key = severity_score × SCALE_FACTOR - (travel_time × 2) - resolution_time
+#   SCALE_FACTOR = 1000 (severity dominates; time penalties refine within tier)
 #   Higher key = higher urgency = served first
 #
 # The heap stores (-heap_key, timestamp, request_id) so Python's min-heap

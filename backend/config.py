@@ -43,6 +43,11 @@ LLM_CONTEXT_SIZE: int = 4096
 API_HOST: str = "127.0.0.1"
 API_PORT: int = 8000
 
+# ── Priority Queue ───────────────────────────────────────────────────────────
+# Multiplied against severity_score so time penalties are significant
+# but cannot fully negate severity (100×1000 >> 60 min travel penalty).
+SCALE_FACTOR: int = 1000
+
 # ── Volunteer Dispatch ────────────────────────────────────────────────────────
 VOLUNTEER_COUNT: int = 6  # V-01 through V-06
 ESCALATION_INTERVAL_SECS: int = 60  # APScheduler job interval

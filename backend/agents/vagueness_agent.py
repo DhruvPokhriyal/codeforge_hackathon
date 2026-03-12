@@ -29,11 +29,21 @@ Respond ONLY in JSON:
 }}"""
 
 
-def resolve_vagueness(transcript: str, llm: Llama) -> dict:
+_FALLBACK_HYPOTHESES = {
+    "CRITICAL": ["cardiac arrest"],
+    "HIGH": ["fracture"],
+    "MEDIUM": ["fever"],
+    "LOW": ["dehydration"],
+}
+
+
+def resolve_vagueness(transcript: str, llm) -> dict:
     """
     Ask LLM to generate plausible conditions per severity level for a vague transcript.
-    Falls back to safe defaults if LLM output is unparseable.
+    Falls back to safe defaults if LLM is None or output is unparseable.
     """
+    if llm is None:
+        return _FALLBACK_HYPOTHESES
     prompt = VAGUENESS_PROMPT.format(transcript=transcript)
     resp = llm(prompt, max_tokens=400, temperature=0.2)
     raw = resp["choices"][0]["text"].strip()
@@ -41,15 +51,10 @@ def resolve_vagueness(transcript: str, llm: Llama) -> dict:
         start, end = raw.find("{"), raw.rfind("}") + 1
         return json.loads(raw[start:end])
     except Exception:
-        return {
-            "CRITICAL": ["cardiac arrest"],
-            "HIGH": ["fracture"],
-            "MEDIUM": ["fever"],
-            "LOW": ["dehydration"],
-        }
+        return _FALLBACK_HYPOTHESES
 
 
-def resolve_and_retrieve(transcript: str, llm: Llama, retrieve_fn) -> list:
+def resolve_and_retrieve(transcript: str, llm, retrieve_fn) -> list:
     """
     Full vagueness resolution pipeline:
       1. Generate per-severity hypotheses from LLM
