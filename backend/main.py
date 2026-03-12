@@ -12,62 +12,46 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-# ── Route Handlers ────────────────────────────────────────────────────────────
-# Import all API endpoint routers
+# Import all route handlers
 from routers import pipeline, approve, queue, volunteers, volunteer_return, inventory
 
-# ── Core Components ───────────────────────────────────────────────────────────
-# Import background services and shared state
+# Import core components
 from core.escalation_scheduler import start_scheduler
 from core.priority_queue import priority_queue
 
-# ── Agent Utilities ───────────────────────────────────────────────────────────
-# Import vector store builder for RAG
+# Import agent utilities
 from agents.retrieval_agent import build_index
 
-# ── Configuration ─────────────────────────────────────────────────────────────
-# Import application settings
+# Import configuration
 from config import API_HOST, API_PORT, PROTOCOLS_DIR
 
+# ── FastAPI Application Initialization ─────────────────────────────────────────
 
-# ── FastAPI Application Initialization ────────────────────────────────────────
-# Create the main FastAPI application instance with metadata
-# This metadata appears in the auto-generated API docs at /docs
 app = FastAPI(
     title="Offline Emergency Intelligence Hub",
     description="Offline AI triage and volunteer dispatch for disaster shelters.",
     version="1.0.0",
 )
 
-
 # ── CORS Middleware Configuration ─────────────────────────────────────────────
 # Security requirement: Only allow connections from localhost
 # This ensures the API remains offline and inaccessible from the network
-# The Electron frontend runs on localhost, so this is sufficient
 app.add_middleware(
     CORSMiddleware,
     # Only these origins are permitted (Electron app runs on localhost)
-    # No external network access allowed - critical for offline security
     allow_origins=["http://localhost", "http://127.0.0.1"],
-    
-    # Allow all HTTP methods (GET, POST, PUT, DELETE, etc.)
-    # The frontend needs various methods for different operations
-    allow_methods=["*"],
-    
-    # Allow all headers (for authentication, content-type, etc.)
-    allow_headers=["*"],
+    allow_methods=["*"],  # Allow all HTTP methods (GET, POST, PUT, etc.)
+    allow_headers=["*"],  # Allow all headers
 )
-
 
 # ── Route Registration ────────────────────────────────────────────────────────
 # Register all API endpoint routers with the main application
-# Each router handles a specific domain of the application
-app.include_router(pipeline.router)           # POST /pipeline - Main triage pipeline (speech/text → assessment)
-app.include_router(approve.router)             # POST /approve - Approve/reject triage results
-app.include_router(queue.router)                # GET /queue - View and manage request queue
-app.include_router(volunteers.router)           # GET /volunteers - Volunteer status and assignment
-app.include_router(volunteer_return.router)     # POST /volunteer/return - Process volunteer returns
-app.include_router(inventory.router)            # GET /inventory, PUT /inventory/refill - Inventory management
+app.include_router(pipeline.router)        # Main triage pipeline (speech/text → assessment)
+app.include_router(approve.router)          # Approve/reject triage results
+app.include_router(queue.router)            # View and manage request queue
+app.include_router(volunteers.router)       # Volunteer status and assignment
+app.include_router(volunteer_return.router) # Process volunteer returns
+app.include_router(inventory.router)        # Inventory management
 
 
 # ── Startup Event Handler ─────────────────────────────────────────────────────
@@ -76,45 +60,28 @@ async def on_startup():
     """
     Initialize background services when the FastAPI application starts.
     
-    This function runs automatically when uvicorn starts the server.
-    It performs two critical initialization tasks that need to happen
-    before the system can handle requests:
+    This runs automatically when uvicorn starts the server.
+    Two main initialization tasks:
     
-    ──────────────────────────────────────────────────────────────────────────
-    Task 1: Build Vector Index (RAG Knowledge Base)
-    ──────────────────────────────────────────────────────────────────────────
-    - Scans the data/protocols/ directory for PDF files
-    - Creates a LlamaIndex vector store for semantic search
-    - This index powers the retrieval_agent to find relevant protocols
-    - Only builds if PDFs exist (skips silently if directory is empty)
-    - Without this, the RAG system cannot retrieve protocol information
+    1. Build Vector Index:
+       - Scans data/protocols/ directory for PDF files
+       - Creates LlamaIndex vector store for semantic search
+       - Used by retrieval_agent to find relevant protocols
+       - Only builds if PDFs exist (skips if directory empty)
     
-    ──────────────────────────────────────────────────────────────────────────
-    Task 2: Start Escalation Scheduler
-    ──────────────────────────────────────────────────────────────────────────
-    - Launches APScheduler background job
-    - Runs every 60 seconds (configurable via ESCALATION_INTERVAL_SECS)
-    - Increases priority of pending requests based on wait time
-    - Ensures old requests don't get forgotten (fairness)
-    - Critical for the priority escalation feature
-    
-    Note: Heavy models (Whisper for transcription, LLaMA for triage) are NOT
-    loaded here. They are loaded lazily on the first POST /pipeline request.
-    This keeps startup time under 1 second for the Electron health-check poll.
+    2. Start Escalation Scheduler:
+       - Launches APScheduler background job
+       - Runs every 60 seconds (configurable)
+       - Increases priority of pending requests over time
+       - Ensures old requests don't get forgotten
     """
     # STEP 1: Build vector index from protocol PDFs (if any exist)
-    # Check if there are any PDF files in the protocols directory
-    pdf_files_exist = any(PROTOCOLS_DIR.glob("*.pdf"))
-    
-    if pdf_files_exist:
-        # Convert directory path to string and build the vector index
-        # This may take a few seconds but only happens once at startup
+    if any(PROTOCOLS_DIR.glob("*.pdf")):
+        # Convert directory path to string and build the index
         build_index(str(PROTOCOLS_DIR))
-        # No return value needed - index is saved to disk
     
     # STEP 2: Start the urgency escalation background job
     # Pass the priority queue instance so scheduler can update request priorities
-    # This starts a background thread that runs independently of requests
     start_scheduler(priority_queue)
 
 
@@ -127,17 +94,8 @@ async def health():
     The Electron main process polls this endpoint every 500ms during startup
     to determine when the backend is ready to accept requests.
     
-    This is critical for the user experience because:
-    1. Electron starts the backend as a subprocess
-    2. It needs to know when the FastAPI server is fully initialized
-    3. Only then does it enable the UI and allow audio recording
-    
-    The endpoint is intentionally lightweight - it doesn't check model loading
-    or database connections. It just confirms the server is running.
-    
     Returns:
         dict: Always {"status": "ok"} when server is running
-              If server is down, the connection will fail/timeout
     """
     return {"status": "ok"}
 
@@ -147,47 +105,20 @@ if __name__ == "__main__":
     """
     Run the FastAPI application with Uvicorn server when script is executed directly.
     
-    This block only runs when you execute `python main.py` directly.
-    When imported by another module (like during testing), this block is skipped.
-    
-    Usage in development:
+    This is used during development and when starting from the command line:
         python main.py
     
-    Usage in production:
-        The Electron app runs this command automatically on startup
-    
-    Configuration Details:
-    ──────────────────────────────────────────────────────────────────────────
-    Host: 127.0.0.1 (localhost only)
-        - Binds only to loopback interface
-        - Not accessible from other machines on the network
-        - Critical for offline security requirement
-    
-    Port: From config (default: 8000)
-        - Configurable via API_PORT in config.py or .env
-        - Must match the port Electron expects (hardcoded in Electron)
-    
-    Reload: Disabled (False)
-        - Auto-reload would restart server on code changes
-        - Useful in development but dangerous in production
-        - Production uses manual restarts only
-    ──────────────────────────────────────────────────────────────────────────
+    Configuration:
+    - Host: 127.0.0.1 (localhost only - secure offline operation)
+    - Port: From config (default: 8000)
+    - Reload: Disabled (must be manually restarted after code changes)
     """
     import uvicorn
 
-    # Start the Uvicorn ASGI server with configuration from config.py
+    # Start the Uvicorn server with configuration from config.py
     uvicorn.run(
-        # ASGI application identifier: "module_name:app_instance_name"
-        # Tells uvicorn to look for 'app' in the 'main' module
-        "main:app",
-        
-        # Bind address - MUST be localhost for security
-        host=API_HOST,          # From config (should be "127.0.0.1")
-        
-        # Port number - must match Electron frontend configuration
-        port=API_PORT,          # From config (default: 8000)
-        
-        # Disable auto-reload for production stability
-        # In development, you can manually enable by changing to True
-        reload=False            # Must manually restart after code changes
+        "main:app",          # ASGI application: "module:app_instance"
+        host=API_HOST,        # Bind address (127.0.0.1 from config)
+        port=API_PORT,        # Port number (from config)
+        reload=False          # Disable auto-reload for production stability
     )
