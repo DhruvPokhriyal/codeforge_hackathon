@@ -150,7 +150,7 @@ async function bootApp() {
       startBackend();
     }
 
-    await waitForHealth();
+    await waitForHealth(90000, 1000);
   } catch (err) {
     console.error('Failed to start backend:', err);
   } finally {

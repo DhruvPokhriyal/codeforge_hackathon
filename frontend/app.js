@@ -919,6 +919,18 @@ async function bootstrapApp() {
     }, DL_CONFIG.polling.volunteersMs);
   }
 
+  if (window.api && typeof window.api.getInventory === 'function') {
+    setInterval(async () => {
+      try {
+        const resp = await window.api.getInventory();
+        INVENTORY = resp.inventory || [];
+        renderInventory();
+      } catch (err) {
+        console.warn('Inventory polling failed', err);
+      }
+    }, DL_CONFIG.polling.queueMs);
+  }
+
   // Timer tick interval uses configurable polling
   setInterval(tickTimers, DL_CONFIG.polling.timersMs);
 }

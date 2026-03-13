@@ -84,7 +84,8 @@ class InventoryManager:
 
     def get_all(self) -> list:
         """Return inventory as a list of dicts (safe for JSON serialisation)."""
-        return self.df.to_dict(orient="records")
+        import numpy as np
+        return self.df.replace({np.nan: None}).to_dict(orient="records")
 
     # ── Internal helpers ──────────────────────────────────────────────────────
 
