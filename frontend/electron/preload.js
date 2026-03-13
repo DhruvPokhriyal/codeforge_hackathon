@@ -47,14 +47,30 @@ function apiCall(method, path, body = null) {
                 data += chunk;
             });
             res.on("end", () => {
+                console.log(`[preload] ${method} ${path} => status=${res.statusCode}, body length=${data.length}`);
                 try {
-                    resolve(JSON.parse(data));
+                    const parsed = data ? JSON.parse(data) : {};
+                    if (path === '/pipeline') {
+                        console.log('[preload] /pipeline response keys:', Object.keys(parsed));
+                        console.log('[preload] /pipeline situations type:', typeof parsed.situations, 'isArray:', Array.isArray(parsed.situations), 'length:', parsed.situations?.length);
+                        console.log('[preload] /pipeline situations[0]:', JSON.stringify(parsed.situations?.[0])?.substring(0, 500));
+                    }
+                    if (res.statusCode >= 400) {
+                        const msg = parsed?.detail || `HTTP ${res.statusCode}`;
+                        reject(new Error(msg));
+                        return;
+                    }
+                    resolve(parsed);
                 } catch (e) {
+                    console.error('[preload] JSON parse error:', e.message, 'raw data (first 500 chars):', data.substring(0, 500));
                     reject(new Error("Invalid JSON response"));
                 }
             });
         });
-        req.on("error", reject);
+        req.on("error", (err) => {
+            console.error(`[preload] ${method} ${path} request error:`, err.message);
+            reject(err);
+        });
         if (payload) req.write(payload);
         req.end();
     });
@@ -67,6 +83,12 @@ contextBridge.exposeInMainWorld("api", {
         apiCall("POST", "/approve", {
             request_id,
             selected_indices,
+            manual_override,
+        }),
+
+    overrideReport: (source_request_id, manual_override) =>
+        apiCall("POST", "/approve/override", {
+            source_request_id,
             manual_override,
         }),
 

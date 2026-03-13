@@ -56,8 +56,13 @@ def dispatch(queue) -> dict | None:
     if not selected:
         selected = top["situations"][:1]
 
-    travel = selected[0]["travel_time_min"]
-    resolve = selected[0]["resolution_time_min"]
+    # Guard: if there are still no situations, use safe defaults
+    if not selected:
+        travel = 10
+        resolve = 20
+    else:
+        travel = selected[0]["travel_time_min"]
+        resolve = selected[0]["resolution_time_min"]
     exp_return = (now + timedelta(minutes=travel + resolve)).strftime("%H:%M:%S")
 
     # Collect items that are available in inventory

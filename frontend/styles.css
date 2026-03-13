@@ -647,7 +647,7 @@ html[data-theme="hc"] .task-card.in-progress {
 /* Timer */
 .card-timer {
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 700;
   color: var(--high);
   white-space: nowrap;
@@ -717,6 +717,49 @@ html[data-theme="hc"] .btn-complete {
   text-transform: uppercase;
   color: var(--text);
   margin-bottom: 4px;
+}
+
+.ai-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.ai-mode-toggle {
+  display: flex;
+  border: 1px solid var(--border-strong);
+}
+
+.ai-mode-btn {
+  border: none;
+  border-right: 1px solid var(--border-strong);
+  background: var(--bg-col);
+  color: var(--text-muted);
+  font-family: var(--font-ui);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+
+.ai-mode-btn:last-child {
+  border-right: none;
+}
+
+.ai-mode-btn:hover:not(:disabled) {
+  color: var(--text);
+}
+
+.ai-mode-btn.active {
+  background: var(--text);
+  color: var(--bg-col);
+}
+
+.ai-mode-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .ai-section-label {

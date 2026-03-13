@@ -48,6 +48,24 @@ const REQUEST_TIMERS = {};
 // ── State ──────────────────────────────────────────────────────────────────────
 let activeTaskId = null;      // request currently in "Returned" modal
 let selectedTaskId = null;    // request selected in queue panel
+let aiPanelMode = 'queue';    // 'queue' | 'incoming'
+
+function updateAiActionsVisibility() {
+  const actions = document.querySelector('.ai-actions');
+  if (!actions) return;
+  const showActions = aiPanelMode === 'incoming' && !!CURRENT_PIPELINE;
+  actions.classList.toggle('hidden', !showActions);
+}
+
+function updateAiModeUi() {
+  const queueBtn = document.getElementById('ai-mode-queue');
+  const incomingBtn = document.getElementById('ai-mode-incoming');
+  if (!queueBtn || !incomingBtn) return;
+
+  queueBtn.classList.toggle('active', aiPanelMode === 'queue');
+  incomingBtn.classList.toggle('active', aiPanelMode === 'incoming');
+  incomingBtn.disabled = !CURRENT_PIPELINE;
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function formatTimer(s) {
@@ -170,13 +188,29 @@ function renderAiPanel() {
   const content = document.getElementById('ai-panel-content');
   if (!content) return;
 
-  // If there is a fresh pipeline result waiting for approval, prioritise showing that
-  if (CURRENT_PIPELINE) {
+  console.log('[renderAiPanel] mode:', aiPanelMode, 'CURRENT_PIPELINE:', !!CURRENT_PIPELINE);
+
+  updateAiModeUi();
+  updateAiActionsVisibility();
+
+  if (aiPanelMode === 'incoming') {
+    if (!CURRENT_PIPELINE) {
+      console.log('[renderAiPanel] CURRENT_PIPELINE is null/undefined');
+      content.innerHTML = '<div class="ai-no-selection">No incoming task awaiting approval.</div>';
+      return;
+    }
+
+    console.log('[renderAiPanel] CURRENT_PIPELINE keys:', Object.keys(CURRENT_PIPELINE));
+    console.log('[renderAiPanel] CURRENT_PIPELINE.situations:', typeof CURRENT_PIPELINE.situations, Array.isArray(CURRENT_PIPELINE.situations), 'length:', CURRENT_PIPELINE.situations?.length);
+    console.log('[renderAiPanel] CURRENT_PIPELINE.situations value:', JSON.stringify(CURRENT_PIPELINE.situations)?.substring(0, 1000));
+
     const sit = CURRENT_PIPELINE.situations?.[0];
     if (!sit) {
+      console.log('[renderAiPanel] sit is falsy! situations[0]:', CURRENT_PIPELINE.situations?.[0]);
       content.innerHTML = '<div class="ai-no-selection">No situations returned from pipeline.</div>';
       return;
     }
+    console.log('[renderAiPanel] sit.label:', sit.label, 'sit.severity:', sit.severity);
     const priority = sit.severity || 'HIGH';
     const severityCls = priority === 'CRITICAL' ? 'critical-text' : 'high-text';
 
@@ -435,10 +469,23 @@ function tickTimers() {
             binary += String.fromCharCode(bytes[i]);
           }
           const audioB64 = btoa(binary);
+          console.log('[app.js] Calling runPipeline, audio base64 length:', audioB64.length);
           const resp = await window.api.runPipeline(audioB64);
+
+          // DEBUG: Log the full response
+          console.log('[app.js] Pipeline response received:', JSON.stringify(resp).substring(0, 2000));
+          console.log('[app.js] Response keys:', Object.keys(resp));
+          console.log('[app.js] situations field:', typeof resp.situations, Array.isArray(resp.situations), 'length:', resp.situations?.length);
+          if (resp.situations?.length > 0) {
+            console.log('[app.js] situations[0] keys:', Object.keys(resp.situations[0]));
+            console.log('[app.js] situations[0].label:', resp.situations[0].label);
+          } else {
+            console.log('[app.js] WARNING: situations is empty or missing!');
+          }
 
           // Hold the latest pipeline result for HITL approval in the AI panel
           CURRENT_PIPELINE = resp;
+          aiPanelMode = 'incoming';
           selectedTaskId = null;
           renderAiPanel();
 
@@ -489,7 +536,9 @@ function tickTimers() {
 
         // Clear current pipeline / override
         CURRENT_PIPELINE = null;
+        aiPanelMode = 'queue';
         window.__DL_PENDING_OVERRIDE = null;
+        selectedTaskId = resp.request_id || null;
 
         renderTasks();
         renderAiPanel();
@@ -568,7 +617,10 @@ function closeOverrideModal() {
 }
 
 (function initOverride() {
-  document.getElementById('btn-override').addEventListener('click', openOverrideModal);
+  document.getElementById('btn-override').addEventListener('click', () => {
+    if (!CURRENT_PIPELINE) return;
+    openOverrideModal();
+  });
   document.getElementById('override-cancel').addEventListener('click', closeOverrideModal);
 
   document.getElementById('override-overlay').addEventListener('click', e => {
@@ -582,19 +634,43 @@ function closeOverrideModal() {
       document.getElementById('override-situation').focus();
       return;
     }
+    if (!CURRENT_PIPELINE) return;
+    if (!window.api || typeof window.api.overrideReport !== 'function') return;
+
     // Gather selected quantities (items with qty > 0)
     const resources = [...document.querySelectorAll('.qty-input')]
       .map(inp => ({ item: inp.dataset.item, qty: parseInt(inp.value || 0) }))
       .filter(r => r.qty > 0);
 
-    // Store pending manual override payload to be attached on next APPROVE
-    window.__DL_PENDING_OVERRIDE = {
+    const payload = {
       condition: situation,
-      items: resources.map(r => r.item),
+      resources,
       notes: steps,
     };
 
-    closeOverrideModal();
+    const submitBtn = document.getElementById('override-submit');
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'APPLYING...';
+
+    window.api.overrideReport(CURRENT_PIPELINE.request_id, payload)
+      .then(resp => {
+        QUEUE = resp.queue || [];
+        VOLUNTEERS = resp.volunteers || [];
+        CURRENT_PIPELINE = null;
+        window.__DL_PENDING_OVERRIDE = null;
+        aiPanelMode = 'queue';
+        selectedTaskId = resp.request_id || null;
+        renderTasks();
+        renderAiPanel();
+      })
+      .catch(err => {
+        console.error('Override apply error', err);
+      })
+      .finally(() => {
+        submitBtn.textContent = 'APPLY OVERRIDE';
+        submitBtn.disabled = false;
+        closeOverrideModal();
+      });
   });
 })();
 
@@ -664,10 +740,8 @@ function openCompleteModal(taskId) {
 }
 
 function updateConfirmBtn() {
-  // Enable confirm if at least one item has a return qty > 0
-  const anyReturned = [...document.querySelectorAll('.return-qty')]
-    .some(inp => parseInt(inp.value || 0) > 0);
-  document.getElementById('modal-confirm').disabled = !anyReturned;
+  // Returning zero items is allowed; keep confirm enabled.
+  document.getElementById('modal-confirm').disabled = false;
 }
 
 function closeModal() {
@@ -728,6 +802,22 @@ document.addEventListener('keydown', e => {
 
 // ── Initialise ────────────────────────────────────────────────────────────────
 async function bootstrapApp() {
+  const queueModeBtn = document.getElementById('ai-mode-queue');
+  const incomingModeBtn = document.getElementById('ai-mode-incoming');
+  if (queueModeBtn) {
+    queueModeBtn.addEventListener('click', () => {
+      aiPanelMode = 'queue';
+      renderAiPanel();
+    });
+  }
+  if (incomingModeBtn) {
+    incomingModeBtn.addEventListener('click', () => {
+      if (!CURRENT_PIPELINE) return;
+      aiPanelMode = 'incoming';
+      renderAiPanel();
+    });
+  }
+
   // Load config from backend if available
   if (window.api && typeof window.api.getSettings === 'function') {
     try {

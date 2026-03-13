@@ -15,6 +15,61 @@ The system must triage every incoming report, retrieve relevant protocols from P
 
 ---
 
+## ▶️ Run The Project
+
+### 1) Install dependencies (first time only)
+
+```bash
+# from project root
+/home/ankit/python/codeforge_hackathon/backend/venv/bin/pip install -r backend/requirements.txt
+cd frontend && npm install
+```
+
+### 2) Recommended run mode (Frontend starts Backend automatically)
+
+```bash
+# from project root
+cd frontend
+npm start
+```
+
+This launches Electron and auto-starts `backend/main.py` using `backend/venv/bin/python`.
+
+### 3) Manual mode (optional)
+
+Run backend and frontend separately if you want explicit terminal control:
+
+```bash
+# Terminal A (from project root)
+backend/venv/bin/python backend/main.py
+```
+
+```bash
+# Terminal B (from project root)
+cd frontend
+npm start
+```
+
+### 4) Quick health check
+
+```bash
+curl http://127.0.0.1:8000/health
+```
+
+Expected response:
+
+```json
+{"status":"ok"}
+```
+
+### 5) If startup fails
+
+- Port already in use: `pkill -f "backend/main.py|electron"` and start again.
+- Missing LLM model: place `Llama-3.2-3B-Instruct-Q4_K_M.gguf` in `backend/models/`.
+- `ffmpeg` missing: install system package (`sudo apt install ffmpeg -y` on Ubuntu).
+
+---
+
 ## 🔄 Complete System Workflow
 
 ```

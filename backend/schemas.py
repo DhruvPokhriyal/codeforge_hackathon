@@ -107,6 +107,13 @@ class ApproveRequest(BaseModel):
     manual_override: Optional[dict] = None  # {"condition": str, "items": [str]}
 
 
+class OverrideRequest(BaseModel):
+    """POST /approve/override — create and enqueue a manual-override task."""
+
+    source_request_id: str
+    manual_override: dict  # {"condition": str, "resources": [{"item": str, "qty": int}], "notes": str}
+
+
 class VolunteerReturnRequest(BaseModel):
     """POST /volunteer/return — volunteer back at base with returned items."""
 
@@ -135,6 +142,13 @@ class PipelineResponse(BaseModel):
 
 class ApproveResponse(BaseModel):
     request_id: str
+    queue: list[dict]
+    volunteers: list[dict]
+
+
+class OverrideResponse(BaseModel):
+    request_id: str
+    source_request_id: str
     queue: list[dict]
     volunteers: list[dict]
 

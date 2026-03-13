@@ -10,6 +10,7 @@
 //
 const { app, BrowserWindow } = require('electron');
 const path = require('path');
+const fs = require('fs');
 const { spawn } = require('child_process');
 const http = require('http');
 
@@ -18,6 +19,24 @@ let backendProcess = null;
 
 const API_HOST = process.env.DL_API_HOST || '127.0.0.1';
 const API_PORT = Number(process.env.DL_API_PORT || 8000);
+
+function resolvePythonCommand(projectRoot) {
+  const isWindows = process.platform === 'win32';
+  const venvPython = path.join(
+    projectRoot,
+    'backend',
+    'venv',
+    isWindows ? 'Scripts' : 'bin',
+    isWindows ? 'python.exe' : 'python',
+  );
+
+  if (fs.existsSync(venvPython)) {
+    return venvPython;
+  }
+
+  // Fallback to PATH executables if local venv is not present.
+  return isWindows ? 'python' : 'python3';
+}
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -43,16 +62,30 @@ function createWindow() {
 function startBackend() {
   if (backendProcess) return backendProcess;
 
+  const projectRoot = path.join(__dirname, '..', '..');
   const backendEntry = path.join(__dirname, '..', '..', 'backend', 'main.py');
+  const pythonCmd = resolvePythonCommand(projectRoot);
 
-  backendProcess = spawn('python', [backendEntry], {
-    cwd: path.join(__dirname, '..', '..'),
+  backendProcess = spawn(pythonCmd, [backendEntry], {
+    cwd: projectRoot,
     env: {
       ...process.env,
       DL_API_HOST: API_HOST,
       DL_API_PORT: String(API_PORT),
     },
-    stdio: 'ignore',
+    stdio: 'pipe',
+  });
+
+  backendProcess.stdout?.on('data', (chunk) => {
+    process.stdout.write(`[backend] ${chunk}`);
+  });
+
+  backendProcess.stderr?.on('data', (chunk) => {
+    process.stderr.write(`[backend] ${chunk}`);
+  });
+
+  backendProcess.on('error', (err) => {
+    console.error('Failed to spawn backend process:', err);
   });
 
   backendProcess.on('exit', () => {
@@ -109,7 +142,14 @@ function waitForHealth(maxWaitMs = 30000, intervalMs = 500) {
 
 async function bootApp() {
   try {
-    startBackend();
+    const backendAlreadyRunning = await waitForHealth(1500, 300)
+      .then(() => true)
+      .catch(() => false);
+
+    if (!backendAlreadyRunning) {
+      startBackend();
+    }
+
     await waitForHealth();
   } catch (err) {
     console.error('Failed to start backend:', err);

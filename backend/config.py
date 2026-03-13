@@ -37,7 +37,7 @@ CONFIDENCE_THRESHOLD: float = 0.8  # below this → vagueness resolver kicks in
 LLAMA_MODEL_PATH: str = str(MODELS_DIR / "Llama-3.2-3B-Instruct-Q4_K_M.gguf")
 LLM_MAX_TOKENS: int = 1200
 LLM_TEMPERATURE: float = 0.15
-LLM_CONTEXT_SIZE: int = 4096
+LLM_CONTEXT_SIZE: int = 8192
 
 # ── FastAPI / Uvicorn ─────────────────────────────────────────────────────────
 API_HOST: str = "127.0.0.1"
