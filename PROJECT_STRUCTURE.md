@@ -136,7 +136,7 @@ emergency-hub/
 │       └── disaster_response.pdf
 │
 ├── models/
-│   └── Llama-3.2-3B-Instruct-Q4_K_M.gguf   # ~2GB — downloaded during setup
+│   └── gemma-3-1b-it-Q5_K_M.gguf           # Gemma 3 1B GGUF model
 │
 ├── vector_store/                        # Auto-built by LlamaIndex on first run
 │   └── (index files)                    # Rebuilt from /data/protocols/ if deleted

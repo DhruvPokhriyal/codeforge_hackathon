@@ -32,9 +32,9 @@ WHISPER_MODEL: str = os.getenv("WHISPER_MODEL", "base")  # base | small | medium
 EMBED_MODEL: str = "sentence-transformers/all-MiniLM-L6-v2"
 RAG_TOP_K: int = 5
 CONFIDENCE_THRESHOLD: float = 0.8  # below this → vagueness resolver kicks in
-
-# ── LLM (llama.cpp) ───────────────────────────────────────────────────────────
-LLAMA_MODEL_PATH: str = str(MODELS_DIR / "Llama-3.2-3B-Instruct-Q4_K_M.gguf")
+# ── LLM (via Ollama) ─────────────────────────────────────────────────────────
+OLLAMA_URL: str = "http://localhost:11434"
+OLLAMA_MODEL: str = "gemma3:1b"
 LLM_MAX_TOKENS: int = 1200
 LLM_TEMPERATURE: float = 0.15
 LLM_CONTEXT_SIZE: int = 8192

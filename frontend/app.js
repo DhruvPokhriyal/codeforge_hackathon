@@ -1,5 +1,5 @@
 // frontend/app.js
-// Digital Lifeboat — All renderer UI logic (Electron renderer).
+// ARIA — All renderer UI logic (Electron renderer).
 "use strict";
 
 // ── Config & State ─────────────────────────────────────────────────────────────
@@ -98,8 +98,8 @@ function renderInventory() {
   el.innerHTML = INVENTORY.map(item => {
     const available = item.Available ?? item.qty ?? 0;
     const total = item.Total ?? item.total ?? 0;
-    const pct     = total > 0 ? Math.round((available / total) * 100) : 0;
-    const isCrit  = pct < 20;
+    const pct = total > 0 ? Math.round((available / total) * 100) : 0;
+    const isCrit = pct < 20;
     const countCls = isCrit ? 'inv-count critical-text' : 'inv-count';
     return `
       <div class="inv-item">
@@ -125,11 +125,11 @@ function renderTasks() {
   document.getElementById('incident-count').textContent = active.length;
 
   el.innerHTML = active.map(task => {
-    const p           = (task.priority || task.severity || 'HIGH').toString().toLowerCase();
-    const status      = task.status || 'PENDING';
-    const stateClass  = status === 'IN_PROGRESS' || status === 'ASSIGNED' ? 'in-progress' : 'pending';
+    const p = (task.priority || task.severity || (task.situations?.[0]?.severity) || 'HIGH').toString().toLowerCase();
+    const status = task.status || 'PENDING';
+    const stateClass = status === 'IN_PROGRESS' || status === 'ASSIGNED' ? 'in-progress' : 'pending';
     const statusLabel = stateClass === 'in-progress' ? (status || 'IN PROGRESS') : 'PENDING';
-    const escalIcon   = task.escalated
+    const escalIcon = task.escalated
       ? '<span class="escalated-icon" title="Priority escalated">&#x26A0;</span>'
       : '';
     const hasVolunteer = !!(task.assigned_volunteer);
@@ -141,24 +141,24 @@ function renderTasks() {
       ? `<div class="card-volunteer">&#x1F464; ${volunteerId}</div>`
       : '';
     const timerSec = REQUEST_TIMERS[task.request_id] ?? 0;
-    const timer    = formatTimer(timerSec);
+    const timer = formatTimer(timerSec);
     const timerCls = timerSec > 600 ? 'card-timer overdue' : 'card-timer';
-    const selCls   = task.request_id === selectedTaskId ? ' card-selected' : '';
+    const selCls = task.request_id === selectedTaskId ? ' card-selected' : '';
 
     return `
       <div class="task-card priority-${p} ${stateClass}${selCls}" data-task-id="${task.request_id}">
         <div class="card-top">
           <div class="card-badges">
-            <span class="priority-badge badge-${p}">[${task.priority || task.severity}]</span>
+            <span class="priority-badge badge-${p}">[${task.priority || task.severity || (task.situations?.[0]?.severity) || 'HIGH'}]</span>
             ${escalIcon}
             <span class="status-badge status-${stateClass}">${statusLabel}</span>
           </div>
           <span class="${timerCls}">T-${timer}</span>
         </div>
-        <div class="card-title">${task.title}</div>
+        <div class="card-title">${task.title || (task.situations?.[0]?.label) || 'Emergency Request'}</div>
         ${volunteerLine}
         <div class="card-footer">
-          <div class="card-location">&#x1F4CD; ${task.location}</div>
+          <div class="card-location">&#x1F4CD; ${task.location || task.request_id}</div>
           ${completeBtn}
         </div>
       </div>`;
@@ -233,11 +233,11 @@ function renderAiPanel() {
       qty: m.quantity,
     }));
     const itemsHtml = items.map(item => {
-      const inv   = INVENTORY.find(i => (i.Item ?? i.name) === item.name);
+      const inv = INVENTORY.find(i => (i.Item ?? i.name) === item.name);
       const avail = inv ? (inv.Available ?? inv.qty) : '?';
       const total = inv ? (inv.Total ?? inv.total) : '?';
-      const pct   = (inv && inv.Total > 0) ? (inv.Available / inv.Total) * 100 : 100;
-      const cls   = pct >= 80 ? 'green-text' : pct >= 40 ? 'orange-text' : 'critical-text';
+      const pct = (inv && inv.Total > 0) ? (inv.Available / inv.Total) * 100 : 100;
+      const cls = pct >= 80 ? 'green-text' : pct >= 40 ? 'orange-text' : 'critical-text';
       return `
       <div class="material-row">
         <span class="material-name">${item.name} &times;${item.qty}</span>
@@ -280,10 +280,11 @@ function renderAiPanel() {
   const task = QUEUE.find(t => t.request_id === selectedTaskId);
   if (!task) return;
 
-  const priority = task.priority || task.severity || 'HIGH';
+  const sit0 = task.situations?.[0];
+  const priority = task.priority || task.severity || sit0?.severity || 'HIGH';
   const severityCls = priority === 'CRITICAL' ? 'critical-text' : 'high-text';
 
-  const steps = task.steps || task.instructions || [];
+  const steps = task.steps || task.instructions || sit0?.instructions || [];
   const stepsHtml = steps.map((s, i) => `
     <div class="step-row">
       <span class="step-num">${i + 1}</span>
@@ -292,7 +293,7 @@ function renderAiPanel() {
 
   const handoff = task.handoff || task.handoff_logs || [];
   const handoffHtml = handoff.map((entry, i) => {
-    const isLast = i === task.handoff.length - 1;
+    const isLast = i === handoff.length - 1;
     return `
       <div class="handoff-entry">
         <div class="handoff-dot${entry.done ? ' done' : ''}"></div>
@@ -305,25 +306,25 @@ function renderAiPanel() {
       </div>`;
   }).join('');
 
-  const sources = task.sources || task.source_chunks || [];
+  const sources = task.sources || task.source_chunks || sit0?.source_chunks || [];
   const sourcesHtml = sources.map(s => `
     <li class="source-item">
       <span class="source-icon">&#x1F4C4;</span>
       <span class="source-name">${s}</span>
     </li>`).join('');
 
-  const items = task.items || (task.materials || []).map(m => ({
+  const items = task.items || (task.materials || sit0?.materials || []).map(m => ({
     name: m.item,
     qty: m.quantity,
   }));
   const itemsHtml = items.map(item => {
-    const inv   = INVENTORY.find(i => (i.Item ?? i.name) === item.name);
+    const inv = INVENTORY.find(i => (i.Item ?? i.name) === item.name);
     const avail = inv ? (inv.Available ?? inv.qty) : '?';
     const total = inv ? (inv.Total ?? inv.total) : '?';
     const baseAvail = inv ? (inv.Available ?? inv.qty) : 0;
     const baseTotal = inv ? (inv.Total ?? inv.total) : 0;
-    const pct   = baseTotal > 0 ? (baseAvail / baseTotal) * 100 : 100;
-    const cls   = pct >= 80 ? 'green-text' : pct >= 40 ? 'orange-text' : 'critical-text';
+    const pct = baseTotal > 0 ? (baseAvail / baseTotal) * 100 : 100;
+    const cls = pct >= 80 ? 'green-text' : pct >= 40 ? 'orange-text' : 'critical-text';
     return `
       <div class="material-row">
         <span class="material-name">${item.name} &times;${item.qty}</span>
@@ -336,7 +337,7 @@ function renderAiPanel() {
     <div class="ai-task-title">${task.title || (task.situations && task.situations[0]?.label) || 'Emergency Request'}</div>
     <div class="ai-meta-chips">
       <span class="ai-chip ${severityCls}">${priority}</span>
-      <span class="ai-chip">&#x23F1; ~${task.estTimeMins ?? (task.situations?.[0]?.resolution_time_min ?? '?')} min</span>
+      <span class="ai-chip">&#x23F1; ~${task.estTimeMins ?? (sit0?.resolution_time_min ?? '?')} min</span>
       <span class="ai-chip">&#x1F465; ${task.estVictims ?? ''}</span>
     </div>
     <hr class="divider" />
@@ -382,8 +383,8 @@ function tickTimers() {
 
 // ── Upload Zone ────────────────────────────────────────────────────────────────
 (function initUpload() {
-  const zone        = document.getElementById('upload-zone');
-  const fileInput   = document.getElementById('audio-file');
+  const zone = document.getElementById('upload-zone');
+  const fileInput = document.getElementById('audio-file');
   const uploadLabel = document.getElementById('upload-label');
 
   // Apply configured accepted extensions to the file input
@@ -426,10 +427,10 @@ function tickTimers() {
 
 // ── Process Memo Button ────────────────────────────────────────────────────────
 (function initProcessBtn() {
-  const btn     = document.getElementById('btn-process');
-  const status  = document.getElementById('process-status');
+  const btn = document.getElementById('btn-process');
+  const status = document.getElementById('process-status');
   const waveform = document.getElementById('waveform');
-  const zone    = document.getElementById('upload-zone');
+  const zone = document.getElementById('upload-zone');
   const fileInput = document.getElementById('audio-file');
 
   btn.addEventListener('click', () => {
@@ -629,7 +630,7 @@ function closeOverrideModal() {
 
   document.getElementById('override-submit').addEventListener('click', () => {
     const situation = document.getElementById('override-situation').value.trim();
-    const steps     = document.getElementById('override-steps').value.trim();
+    const steps = document.getElementById('override-steps').value.trim();
     if (!situation) {
       document.getElementById('override-situation').focus();
       return;
@@ -709,7 +710,7 @@ function openCompleteModal(taskId) {
     qtyInput.min = 0;
     qtyInput.max = item.quantity;
     qtyInput.dataset.item = item.item;
-    qtyInput.dataset.max  = item.quantity;
+    qtyInput.dataset.max = item.quantity;
 
     const btnPlus = document.createElement('button');
     btnPlus.className = 'btn btn-qty';

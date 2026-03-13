@@ -85,7 +85,7 @@ FASTAPI (127.0.0.1:8000)
     │    is_vague = (top_score < 0.8)
     │         │
     │    is_vague=True ──→ agents/vagueness_agent.py
-    │         │              LLaMA 3.2 3B
+    │         │              Gemma 3 1B
     │         │              generate hypotheses per severity level
     │         │              retry retrieval per hypothesis
     │         │              merge + deduplicate chunks
@@ -93,7 +93,7 @@ FASTAPI (127.0.0.1:8000)
     │    is_vague=False ─→ proceed with original chunks
     │
     ├─ agents/rag_triage_agent.py
-    │    LLaMA 3.2 3B
+    │    Gemma 3 1B
     │    transcript + chunks → situations[] JSON array
     │    Each situation: label · severity · severity_score
     │                    travel_time · resolution_time
@@ -290,8 +290,8 @@ Response: [
 | Electron shell | ~200 MB | instant |
 | Whisper base | ~500 MB | 2–4s (10s clip) |
 | Facebook Denoiser dns64 | ~300 MB | 1–3s |
-| LLaMA 3.2 3B (vagueness) | ~2.5 GB | 8–12s |
-| LLaMA 3.2 3B (triage) | shared | 10–18s |
+| Gemma 3 1B (vagueness) | ~0.9 GB | 4–8s |
+| Gemma 3 1B (triage) | shared | 5–10s |
 | LlamaIndex retrieval | ~200 MB | <1s |
 | Heap + dispatch | ~5 MB | <10ms |
 | APScheduler | ~10 MB | ~2ms/tick |

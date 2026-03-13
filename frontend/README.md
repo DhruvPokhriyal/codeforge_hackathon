@@ -1,4 +1,4 @@
-# Digital Lifeboat — Frontend
+# ARIA — Frontend
 
 Electron-based desktop application for offline disaster relief coordination.
 

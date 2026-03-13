@@ -31,8 +31,8 @@ poetry install
 
 ### 1.3. Download models & prepare data
 
-1. **LLaMA model**  
-   Place a `Llama-3.2-3B-Instruct-Q4_K_M.gguf` (or compatible) file in:
+1. **Gemma model**  
+  Place `gemma-3-1b-it-Q5_K_M.gguf` in:
 
    ```text
    backend/models/
@@ -41,7 +41,7 @@ poetry install
    The default path is configured in `config.py`:
 
    ```python
-   LLAMA_MODEL_PATH = MODELS_DIR / "Llama-3.2-3B-Instruct-Q4_K_M.gguf"
+  GEMMA_MODEL_PATH = MODELS_DIR / "gemma-3-1b-it-Q5_K_M.gguf"
    ```
 
 2. **Protocol PDFs (for RAG)**  
@@ -82,7 +82,7 @@ On startup:
 - `config.py`  
   Central place for:
   - paths (`DATA_DIR`, `PROTOCOLS_DIR`, `INVENTORY_CSV`, `MODELS_DIR`, …)
-  - model settings (`WHISPER_MODEL`, `EMBED_MODEL`, `LLAMA_MODEL_PATH`, …)
+  - model settings (`WHISPER_MODEL`, `EMBED_MODEL`, `GEMMA_MODEL_PATH`, …)
   - API host/port
   - volunteer settings and escalation interval.
 
@@ -96,7 +96,7 @@ Located in `agents/` — all are pure-function style modules:
 - `intake_agent.py` — STEP 3: Whisper STT (`transcribe()`).
 - `retrieval_agent.py` — STEP 4: LlamaIndex retrieval (`build_index()`, `retrieve()`).
 - `vagueness_agent.py` — STEP 4b: hypothesis expansion when retrieval is low-confidence.
-- `rag_triage_agent.py` — STEP 5: RAG + LLaMA triage to multi-situation JSON.
+- `rag_triage_agent.py` — STEP 5: RAG + Gemma triage to multi-situation JSON.
 - `logistics_agent.py` — STEP 6: annotate situations with inventory availability.
 - `agents/__init__.py` — re-exports all public agent functions for easy import.
 

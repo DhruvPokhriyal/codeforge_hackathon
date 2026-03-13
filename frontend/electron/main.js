@@ -1,5 +1,5 @@
 // frontend/electron/main.js
-// Electron Main Process — Digital Lifeboat
+// Electron Main Process — ARIA
 //
 // Responsibilities:
 //   - Spawn FastAPI backend (python backend/main.py)
@@ -44,7 +44,7 @@ function createWindow() {
     height: 900,
     minWidth: 1100,
     minHeight: 700,
-    title: 'Digital Lifeboat',
+    title: 'ARIA',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true, // required for contextBridge

@@ -142,8 +142,8 @@ Minimum `package.json`:
 python -c "import whisper; whisper.load_model('base'); print('Whisper base ✅')"
 ```
 
-### Model 2: LLaMA 3.2 3B Q4_K_M GGUF (manual)
-**Size:** ~2.0 GB
+### Model 2: Gemma 3 1B Q5_K_M GGUF (manual)
+**Size:** ~0.9 GB
 
 ```bash
 mkdir -p models
@@ -151,18 +151,18 @@ mkdir -p models
 python -c "
 from huggingface_hub import hf_hub_download
 hf_hub_download(
-    repo_id='bartowski/Llama-3.2-3B-Instruct-GGUF',
-    filename='Llama-3.2-3B-Instruct-Q4_K_M.gguf',
+  repo_id='bartowski/gemma-3-1b-it-GGUF',
+  filename='gemma-3-1b-it-Q5_K_M.gguf',
     local_dir='./models'
 )
-print('LLaMA ✅')
+print('Gemma ✅')
 "
 ```
 
 **Alternative:**
 ```bash
 wget -P ./models \
-  "https://huggingface.co/bartowski/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct-Q4_K_M.gguf"
+  "https://huggingface.co/bartowski/gemma-3-1b-it-GGUF/resolve/main/gemma-3-1b-it-Q5_K_M.gguf"
 ```
 
 ### Model 3: all-MiniLM-L6-v2 (auto on first use)
@@ -292,7 +292,7 @@ API explorer: `http://127.0.0.1:8000/docs`
 | Model | Location | Size | How Downloaded |
 |-------|----------|------|----------------|
 | `whisper-base` | `~/.cache/whisper/` | 140 MB | Auto |
-| `Llama-3.2-3B-Instruct-Q4_K_M.gguf` | `./models/` | ~2.0 GB | Manual (Step 4) |
+| `gemma-3-1b-it-Q5_K_M.gguf` | `./models/` | ~0.9 GB | Manual (Step 4) |
 | `all-MiniLM-L6-v2` | `~/.cache/huggingface/` | 80 MB | Auto |
 | `facebook dns64` | `~/.cache/torch/hub/` | ~90 MB | Auto |
 

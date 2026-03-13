@@ -6,7 +6,7 @@
 #   1. Build LlamaIndex vector store from data/protocols/ (skipped if no PDFs)
 #   2. Start APScheduler escalation job (every 60s)
 #
-# All models (Whisper, LLaMA) are loaded lazily on first pipeline request
+# All models (Whisper, Gemma) are loaded lazily on first pipeline request
 # to keep startup time fast for the Electron health-check poll.
 
 from contextlib import asynccontextmanager

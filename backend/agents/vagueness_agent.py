@@ -12,8 +12,6 @@
 
 import json
 
-from llama_cpp import Llama
-
 VAGUENESS_PROMPT = """You are an emergency medical AI.
 The following distress report is unclear or ambiguous.
 Generate 2-3 possible medical conditions for each severity level.
@@ -58,16 +56,23 @@ def resolve_and_retrieve(transcript: str, llm, retrieve_fn) -> list:
     """
     Full vagueness resolution pipeline:
       1. Generate per-severity hypotheses from LLM
-      2. Call retrieve_fn for each hypothesis query (top_k=3)
+      2. Call retrieve_fn for each hypothesis query (top_k=3), max 2 runs
       3. Merge chunks, deduplicate by text content, sort by score descending
     Returns top 10 unique chunks with hypothesis metadata attached.
     """
+    MAX_RETRIEVAL_RUNS = 2
+
     hypotheses = resolve_vagueness(transcript, llm)
     all_chunks: list[dict] = []
     seen_texts: set[str] = set()
+    runs = 0
 
     for severity, conditions in hypotheses.items():
+        if runs >= MAX_RETRIEVAL_RUNS:
+            break
         for condition in conditions:
+            if runs >= MAX_RETRIEVAL_RUNS:
+                break
             query = f"{condition} first aid emergency treatment"
             result = retrieve_fn(query, top_k=3)
             for chunk in result["chunks"]:
@@ -76,5 +81,7 @@ def resolve_and_retrieve(transcript: str, llm, retrieve_fn) -> list:
                     chunk["hypothesis"] = condition
                     chunk["hypothesis_severity"] = severity
                     all_chunks.append(chunk)
+            runs += 1
+            print(f"[VAGUENESS] Run {runs}/{MAX_RETRIEVAL_RUNS}: query='{condition}', got {len(result['chunks'])} chunks")
 
     return sorted(all_chunks, key=lambda c: c["score"], reverse=True)[:10]

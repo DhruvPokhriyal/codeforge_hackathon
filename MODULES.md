@@ -32,7 +32,7 @@ Each agent can be run and tested in isolation.
 | `backend/agents/intake_agent.py` | 3 | Whisper base STT — clean WAV → transcript string |
 | `backend/agents/retrieval_agent.py` | 4 | LlamaIndex RAG — transcript → top-k chunks + confidence |
 | `backend/agents/vagueness_agent.py` | 4b | LLM hypothesis expansion when `top_score < 0.8` |
-| `backend/agents/rag_triage_agent.py` | 5 | LLaMA 3.2 3B — chunks + transcript → multi-situation JSON |
+| `backend/agents/rag_triage_agent.py` | 5 | Gemma 3 1B — chunks + transcript → multi-situation JSON |
 | `backend/agents/logistics_agent.py` | 6 | Fuzzy inventory check — annotates each material with availability |
 | `backend/utils/audio_utils.py` | — | `save_base64_wav()` · `get_clean_path()` · `cleanup_temp()` |
 | `backend/agents/__init__.py` | — | Public interface — re-exports all agent functions |

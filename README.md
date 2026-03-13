@@ -65,7 +65,7 @@ Expected response:
 ### 5) If startup fails
 
 - Port already in use: `pkill -f "backend/main.py|electron"` and start again.
-- Missing LLM model: place `Llama-3.2-3B-Instruct-Q4_K_M.gguf` in `backend/models/`.
+- Missing LLM model: place `gemma-3-1b-it-Q5_K_M.gguf` in `backend/models/`.
 - `ffmpeg` missing: install system package (`sudo apt install ffmpeg -y` on Ubuntu).
 
 ---
@@ -424,8 +424,8 @@ DISPLAY:
 | Audio Denoising | `noisereduce` + Facebook Denoiser (benchmarked) | Shelter noise removal |
 | Speech-to-Text | `openai-whisper` base | Audio → transcript |
 | RAG Retrieval | `LlamaIndex` + `all-MiniLM-L6-v2` | Semantic PDF search with confidence scores |
-| Vagueness Resolver | LLaMA 3.2 3B GGUF | Expands vague queries into hypotheses |
-| RAG LLM + Triage | LLaMA 3.2 3B GGUF | Multi-situation report + severity + instructions |
+| Vagueness Resolver | Gemma 3 1B GGUF | Expands vague queries into hypotheses |
+| RAG LLM + Triage | Gemma 3 1B GGUF | Multi-situation report + severity + instructions |
 | Heap Key Escalation | APScheduler + custom formula | Exponential urgency escalation |
 | Priority Queue | Python `heapq` | Max-heap with dynamic key escalation |
 | Dispatch Engine | Custom Python scheduler | Volunteer assignment, timer, return flow |
@@ -447,7 +447,7 @@ emergency-hub/
 │   ├── core/           priority_queue · dispatch_engine · escalation_scheduler · request_store
 │   └── utils/          logger · audio_utils · inventory_manager
 ├── data/               inventory.csv · protocols/*.pdf
-├── models/             LLaMA GGUF
+├── models/             Gemma GGUF
 └── vector_store/       auto-generated LlamaIndex index
 ```
 
@@ -459,7 +459,7 @@ emergency-hub/
 git clone https://github.com/your-team/emergency-hub.git && cd emergency-hub
 python -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
-python scripts/download_models.py   # downloads LLaMA + Whisper + MiniLM
+python scripts/download_models.py   # downloads Gemma + Whisper + MiniLM
 npm install
 npm start
 ```
@@ -475,7 +475,7 @@ npm start
 | **Reliability** | Confidence-gated RAG, vagueness resolver, HITL override, exponential escalation prevents starvation, volunteer timer with freeze-on-zero |
 | **Feasibility** | All models CPU-only, full pipeline <25s, heap + escalation in microseconds, single packaged installer |
 | **Impact** | Every person in distress eventually served (no starvation). Explainable AI decisions. HITL keeps humans in control. One laptop runs an entire shelter. |
-| **Open-Source** | Whisper · LLaMA · LlamaIndex · noisereduce · Electron · FastAPI · APScheduler — 100% open-source |
+| **Open-Source** | Whisper · Gemma · LlamaIndex · noisereduce · Electron · FastAPI · APScheduler — 100% open-source |
 
 ---
 

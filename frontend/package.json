@@ -1,7 +1,7 @@
 {
     "name": "digital-lifeboat",
     "version": "1.0.0",
-    "description": "Digital Lifeboat — Offline Disaster Relief Command Centre (Electron)",
+    "description": "ARIA — Offline Disaster Relief Command Centre (Electron)",
     "main": "electron/main.js",
     "scripts": {
         "start": "electron .",

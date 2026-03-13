@@ -2,7 +2,7 @@
 # STEP 5 — RAG LLM + Triage
 #
 # Core triage agent. Reads the transcript + retrieved PDF chunks and generates
-# a structured multi-situation report via the local LLaMA 3.2 3B model.
+# a structured multi-situation report via the local Gemma 3 1B GGUF model.
 #
 # Public interface:
 #   compute_heap_key(severity_score, travel_time, resolution_time) -> float
@@ -15,8 +15,6 @@
 #       instructions, reasoning, source_chunks, selected=False
 
 import json
-
-from llama_cpp import Llama
 
 from config import SCALE_FACTOR, LLM_MAX_TOKENS, LLM_TEMPERATURE, LLM_CONTEXT_SIZE
 
@@ -55,7 +53,7 @@ Respond ONLY with valid JSON array. No extra text.
   }}
 ]"""
 
-_FALLBACK_SITUATION = {
+_FALLBACK_SITUATION_STATIC = {
     "label": "Unknown Emergency",
     "severity": "HIGH",
     "severity_score": 75,
@@ -64,9 +62,130 @@ _FALLBACK_SITUATION = {
     "confidence": 0.5,
     "materials": [],
     "instructions": ["Assess situation carefully on arrival"],
-    "reasoning": "JSON parse failed — defaulted to HIGH as safe upper bound",
+    "reasoning": "LLM unavailable — defaulted to HIGH as safe upper bound",
 }
 
+import re
+
+
+def _build_fallback_from_chunks(chunks: list) -> dict:
+    """
+    Build a smart fallback situation from the top RAG chunk when the LLM
+    fails or is unavailable.  Derives label from the PDF filename and
+    extracts numbered steps from the chunk text as instructions.
+    """
+    if not chunks:
+        return dict(_FALLBACK_SITUATION_STATIC)
+
+    top = chunks[0]
+    source = top.get("source", "unknown")
+    text = top.get("text", "")
+
+    # Derive label from PDF filename, e.g. "MED-01_wounds_bleeding.pdf" → "Wounds Bleeding"
+    name_part = re.sub(r'\.pdf$', '', source, flags=re.IGNORECASE)
+    name_part = re.sub(r'^[A-Z]+-\d+_?', '', name_part)  # strip prefix like "MED-01_"
+    label = name_part.replace('_', ' ').replace('-', ' ').strip().title() or "Emergency"
+
+    # Determine severity from protocol type prefix
+    if source.upper().startswith("SIT"):
+        severity, severity_score = "CRITICAL", 90
+    elif source.upper().startswith("QR") or source.upper().startswith("MED"):
+        severity, severity_score = "HIGH", 80
+    else:
+        severity, severity_score = "HIGH", 75
+
+    # Extract numbered steps / bullet points from chunk text as instructions
+    # Look for lines starting with digits or dashes/bullets
+    lines = text.split('\n')
+    instructions = []
+    for line in lines:
+        line = line.strip()
+        # Match numbered steps (1. ... or 1) ...) or bullet points (- ... or • ...)
+        if re.match(r'^(\d+[\.\)]\s|[-•]\s)', line):
+            step = re.sub(r'^(\d+[\.\)]\s*|[-•]\s*)', '', line).strip()
+            if step and len(step) > 5:
+                instructions.append(step)
+
+    # If no structured steps found, split text into sentence-like instructions
+    if not instructions:
+        sentences = re.split(r'[.!]\s+', text)
+        instructions = [s.strip() + '.' for s in sentences if len(s.strip()) > 15][:5]
+
+    if not instructions:
+        instructions = ["Follow protocol from " + source, "Assess situation carefully on arrival"]
+
+    print(f"[RAG_TRIAGE] Smart fallback: label='{label}', severity={severity}, {len(instructions)} instructions from {source}")
+
+    return {
+        "label": label,
+        "severity": severity,
+        "severity_score": severity_score,
+        "travel_time_min": 10,
+        "resolution_time_min": 20,
+        "confidence": top.get("score", 0.5),
+        "materials": [],
+        "instructions": instructions[:6],
+        "reasoning": f"LLM unavailable — derived from top chunk: {source} (score={top.get('score', 0):.2f})",
+    }
+
+
+# Regex to match a JSON array — non-greedy from [ to matching ]
+_JSON_ARRAY_RE = re.compile(r'\[.*?\]', re.DOTALL)
+
+
+def _parse_situations_json(raw: str) -> list:
+    """
+    Parse situation dicts from LLM raw output.
+
+    Handles common LLM output quirks:
+      - Single valid JSON array: '[{...}, {...}]'
+      - Multiple separate arrays: '[{...}] \n [{...}]'
+      - Markdown-wrapped: '```json\n[{...}]\n```'
+      - Extra text around the JSON
+    Returns a list of dicts (possibly empty).
+    """
+    # Strip markdown code fences if present
+    cleaned = re.sub(r'```(?:json)?\s*', '', raw).strip()
+
+    # Try parsing the whole thing first (fastest path)
+    try:
+        start = cleaned.find("[")
+        end = cleaned.rfind("]") + 1
+        if start >= 0 and end > start:
+            result = json.loads(cleaned[start:end])
+            if isinstance(result, list):
+                return result
+    except json.JSONDecodeError:
+        pass
+
+    # LLM sometimes outputs multiple separate arrays — find and merge them all
+    merged = []
+    # Use a bracket-depth parser instead of regex for reliability
+    i = 0
+    while i < len(cleaned):
+        if cleaned[i] == '[':
+            depth = 0
+            start_idx = i
+            while i < len(cleaned):
+                if cleaned[i] == '[':
+                    depth += 1
+                elif cleaned[i] == ']':
+                    depth -= 1
+                    if depth == 0:
+                        fragment = cleaned[start_idx:i + 1]
+                        try:
+                            parsed = json.loads(fragment)
+                            if isinstance(parsed, list):
+                                merged.extend(parsed)
+                        except json.JSONDecodeError:
+                            print(f"[RAG_TRIAGE] Skipping unparseable array fragment: {fragment[:200]}")
+                        break
+                i += 1
+        i += 1
+
+    if merged:
+        print(f"[RAG_TRIAGE] Merged {len(merged)} situations from multiple arrays")
+    return merged
 
 def _safe_completion_budget(llm, prompt: str) -> int:
     """
@@ -113,12 +232,12 @@ def run_rag_triage(transcript: str, chunks: list, llm) -> list:
     """
     Run the RAG triage prompt and parse the multi-situation JSON response.
     Attaches heap_key, source_chunks, and selected=False to each situation.
-    Falls back to _FALLBACK_SITUATION if LLM is None or output cannot be parsed.
+    Falls back to chunk-derived situation if LLM is None or output cannot be parsed.
     """
     print(f"[RAG_TRIAGE] Called with transcript='{transcript[:100]}', {len(chunks)} chunks, llm={llm is not None}")
     if llm is None:
-        print("[RAG_TRIAGE] LLM is None, using FALLBACK situation")
-        situations = [dict(_FALLBACK_SITUATION)]
+        print("[RAG_TRIAGE] LLM is None, using smart fallback from chunks")
+        situations = [_build_fallback_from_chunks(chunks)]
     else:
         # Progressively trim chunks until the prompt fits within context
         # with enough room for generation (at least 256 tokens)
@@ -150,7 +269,7 @@ def run_rag_triage(transcript: str, chunks: list, llm) -> list:
             max_tokens = _safe_completion_budget(llm, prompt)
             if max_tokens < MIN_GENERATION_TOKENS:
                 print(f"[RAG_TRIAGE] Cannot generate: max_tokens={max_tokens}, using FALLBACK situation")
-                situations = [dict(_FALLBACK_SITUATION)]
+                situations = [_build_fallback_from_chunks(chunks)]
                 # skip the LLM call entirely
                 max_tokens = 0
 
@@ -179,17 +298,11 @@ def run_rag_triage(transcript: str, chunks: list, llm) -> list:
                 print(f"[RAG_TRIAGE] Exception: {e}")
                 raw = "[]"
 
-            try:
-                start, end = raw.find("["), raw.rfind("]") + 1
-                print(f"[RAG_TRIAGE] JSON slice: start={start}, end={end}")
-                situations = json.loads(raw[start:end])
-                print(f"[RAG_TRIAGE] Parsed {len(situations)} situations from LLM")
-                if not situations:
-                    print("[RAG_TRIAGE] Parsed list is empty, using FALLBACK")
-                    situations = [dict(_FALLBACK_SITUATION)]
-            except Exception as e:
-                print(f"[RAG_TRIAGE] JSON parse failed: {e}, using FALLBACK")
-                situations = [dict(_FALLBACK_SITUATION)]
+            situations = _parse_situations_json(raw)
+            print(f"[RAG_TRIAGE] Parsed {len(situations)} situations from LLM")
+            if not situations:
+                print("[RAG_TRIAGE] Parsed list is empty, using FALLBACK")
+                situations = [_build_fallback_from_chunks(chunks)]
         # else: situations already set to FALLBACK above
 
     for s in situations:
