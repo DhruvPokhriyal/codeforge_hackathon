@@ -9,7 +9,7 @@ APScheduler==3.11.2
 # Audio denoising
 noisereduce==3.0.3
 soundfile==0.13.1
-scipy==1.17.1
+scipy==1.11.4
 # denoiser==0.1.5         # Facebook DNS denoiser (optional, only needed when DENOISER=facebook)
 # torchaudio              # also required for facebook denoiser backend
 
@@ -17,12 +17,12 @@ scipy==1.17.1
 # System: sudo apt install ffmpeg -y   (required by Whisper for audio loading)
 openai-whisper==20250625
 tiktoken==0.12.0
-numba==0.64.0
+numba==0.57.1
 
 # Deep learning runtime (CPU-only build — do NOT use default PyPI torch, it pulls CUDA)
 # Install with: pip install torch --index-url https://download.pytorch.org/whl/cpu
-torch==2.10.0+cpu
-numpy==2.4.3
+torch==2.10.0
+numpy==1.24.4
 
 # RAG / LlamaIndex + HuggingFace embeddings
 llama-index-core==0.14.16
@@ -35,6 +35,6 @@ transformers==5.3.0
 llama_cpp_python==0.3.16
 
 # Inventory
-pandas==3.0.1
+pandas==2.2.3
 RapidFuzz==3.14.3
 
