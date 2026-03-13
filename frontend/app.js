@@ -549,7 +549,7 @@ function openOverrideModal() {
       qtyInput.value = Math.max(0, parseInt(qtyInput.value || 0) - 1);
     });
     btnPlus.addEventListener('click', () => {
-      qtyInput.value = Math.min(item.qty, parseInt(qtyInput.value || 0) + 1);
+      qtyInput.value = Math.min(maxQty, parseInt(qtyInput.value || 0) + 1);
     });
 
     row.appendChild(nameEl);
@@ -645,7 +645,8 @@ function openCompleteModal(taskId) {
       updateConfirmBtn();
     });
     btnPlus.addEventListener('click', () => {
-      qtyInput.value = Math.min(item.qty, parseInt(qtyInput.value || 0) + 1);
+      const max = parseInt(qtyInput.dataset.max || item.quantity, 10);
+      qtyInput.value = Math.min(max, parseInt(qtyInput.value || 0) + 1);
       updateConfirmBtn();
     });
     qtyInput.addEventListener('input', updateConfirmBtn);
