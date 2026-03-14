@@ -49,5 +49,5 @@ API_PORT: int = 8000
 SCALE_FACTOR: int = 1000
 
 # ── Volunteer Dispatch ────────────────────────────────────────────────────────
-VOLUNTEER_COUNT: int = 6  # V-01 through V-06
+VOLUNTEER_COUNT: int = 3  # V-01 through V-03
 ESCALATION_INTERVAL_SECS: int = 60  # APScheduler job interval
