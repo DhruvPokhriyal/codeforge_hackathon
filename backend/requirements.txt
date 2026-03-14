@@ -19,9 +19,14 @@ openai-whisper==20250625
 tiktoken==0.12.0
 numba==0.64.0
 
-# Deep learning runtime (CPU-only build — do NOT use default PyPI torch, it pulls CUDA)
-# Install with: pip install torch --index-url https://download.pytorch.org/whl/cpu
-torch==2.10.0+cpu
+# Deep learning runtime
+# NOTE: The "+cpu" build tag is not published for macOS wheels on PyPI, so
+# pinning "torch==X+cpu" fails on macOS. The plain PyPI "torch==X" wheel is
+# already CPU-only on macOS.
+#
+# If you are on Linux and want explicit CPU wheels, use:
+#   pip install torch==2.10.0 --index-url https://download.pytorch.org/whl/cpu
+torch==2.10.0
 numpy==2.4.3
 
 # RAG / LlamaIndex + HuggingFace embeddings

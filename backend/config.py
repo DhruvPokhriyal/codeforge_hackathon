@@ -4,10 +4,26 @@
 # Import: from config import DENOISER, CONFIDENCE_THRESHOLD, ...
 
 import os
+import sys
 from pathlib import Path
 
+
+def _get_base_dir() -> Path:
+    """
+    Resolve the runtime base directory.
+
+    - In normal (source) mode, this is the backend package directory.
+    - In frozen (PyInstaller) mode, this is the extracted bundle directory.
+    """
+    if getattr(sys, "frozen", False):
+        # Running inside a PyInstaller bundle
+        return Path(getattr(sys, "_MEIPASS", Path.cwd()))
+    # Running from source
+    return Path(__file__).parent
+
+
 # ── Paths ─────────────────────────────────────────────────────────────────────
-BASE_DIR = Path(__file__).parent
+BASE_DIR = _get_base_dir()
 DATA_DIR = BASE_DIR / "data"
 PROTOCOLS_DIR = DATA_DIR / "protocols"
 INVENTORY_CSV = DATA_DIR / "inventory.csv"

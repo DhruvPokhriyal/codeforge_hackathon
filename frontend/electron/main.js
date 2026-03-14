@@ -20,7 +20,9 @@ let backendProcess = null;
 const API_HOST = process.env.DL_API_HOST || '127.0.0.1';
 const API_PORT = Number(process.env.DL_API_PORT || 8000);
 
-function resolvePythonCommand(projectRoot) {
+const isDev = !app.isPackaged;
+
+function resolveDevPythonCommand(projectRoot) {
   const isWindows = process.platform === 'win32';
   const venvPython = path.join(
     projectRoot,
@@ -36,6 +38,27 @@ function resolvePythonCommand(projectRoot) {
 
   // Fallback to PATH executables if local venv is not present.
   return isWindows ? 'python' : 'python3';
+}
+
+function resolvePackagedPythonCommand() {
+  // In packaged mode, we bundle the entire backend (including its venv)
+  // under process.resourcesPath/backend. Use that Python interpreter.
+  const resourcesRoot = process.resourcesPath;
+  const isWindows = process.platform === 'win32';
+
+  const candidate = path.join(
+    resourcesRoot,
+    'backend',
+    'venv',
+    isWindows ? 'Scripts' : 'bin',
+    isWindows ? 'python.exe' : 'python',
+  );
+
+  if (fs.existsSync(candidate)) {
+    return candidate;
+  }
+
+  throw new Error(`Packaged Python interpreter not found at: ${candidate}`);
 }
 
 function createWindow() {
@@ -62,12 +85,25 @@ function createWindow() {
 function startBackend() {
   if (backendProcess) return backendProcess;
 
-  const projectRoot = path.join(__dirname, '..', '..');
-  const backendEntry = path.join(__dirname, '..', '..', 'backend', 'main.py');
-  const pythonCmd = resolvePythonCommand(projectRoot);
+  let backendEntry;
+  let pythonCmd;
+  let cwd;
+
+  if (isDev) {
+    const projectRoot = path.join(__dirname, '..', '..');
+    backendEntry = path.join(projectRoot, 'backend', 'main.py');
+    pythonCmd = resolveDevPythonCommand(projectRoot);
+    cwd = projectRoot;
+  } else {
+    const resourcesRoot = process.resourcesPath;
+    const backendRoot = path.join(resourcesRoot, 'backend');
+    backendEntry = path.join(backendRoot, 'main.py');
+    pythonCmd = resolvePackagedPythonCommand();
+    cwd = backendRoot;
+  }
 
   backendProcess = spawn(pythonCmd, [backendEntry], {
-    cwd: projectRoot,
+    cwd,
     env: {
       ...process.env,
       DL_API_HOST: API_HOST,
