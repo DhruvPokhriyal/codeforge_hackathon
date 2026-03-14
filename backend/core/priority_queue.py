@@ -38,7 +38,7 @@ class PriorityQueue:
         Return the highest-priority PENDING request without removing it.
         Skips ASSIGNED / RESOLVED requests in the heap.
         """
-        for _neg_key, _ts, req_id in self._heap:
+        for _neg_key, _ts, req_id in sorted(self._heap):
             req = self._store.get(req_id)
             if req and req.get("status") == "PENDING":
                 return req
