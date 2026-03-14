@@ -137,11 +137,16 @@ body {
 }
 
 /* ── Theme Switcher (bottom-left) ───────────────────────────────────────────── */
-.theme-switcher {
+.switchers-container {
   position: fixed;
   bottom: 14px;
   left: 14px;
   z-index: 200;
+  display: flex;
+  flex-direction: column;
+}
+
+.theme-switcher {
   display: flex;
   gap: 0;
   border: 1px solid var(--border-strong);
@@ -179,6 +184,81 @@ html[data-theme="hc"] .theme-btn {
   border: 1px solid var(--border);
   font-weight: 900;
 }
+
+/* ── NPU/CPU Switcher ───────────────────────────────────────────────────────── */
+.npu-switcher {
+  display: flex;
+  gap: 0;
+  border: 1px solid var(--border-strong);
+  margin-top: 5px;
+}
+
+
+
+.npu-btn {
+
+  padding: 5px 13px;
+
+  border: none;
+
+  border-right: 1px solid var(--border-strong);
+
+  background: var(--bg-col);
+
+  color: var(--text);
+
+  font-size: 11px;
+
+  font-weight: 700;
+
+  letter-spacing: 0.08em;
+
+  cursor: pointer;
+
+  font-family: var(--font-ui);
+
+  transition: background 0.12s, color 0.12s;
+
+}
+
+
+
+.npu-btn:last-child {
+
+  border-right: none;
+
+}
+
+
+
+.npu-btn:hover {
+
+  background: var(--text);
+
+  color: var(--bg);
+
+}
+
+
+
+.npu-btn.active {
+
+  background: var(--text);
+
+  color: var(--bg);
+
+}
+
+
+
+html[data-theme="hc"] .npu-btn {
+
+  border: 1px solid var(--border);
+
+  font-weight: 900;
+
+}
+
 
 /* ── 3-Column Layout ─────────────────────────────────────────────────────────── */
 .layout {
@@ -254,6 +334,8 @@ html[data-theme="hc"] .divider {
 
 /* ── Inventory List ──────────────────────────────────────────────────────────── */
 .inventory-list {
+  height: 50%;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 10px;

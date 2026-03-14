@@ -65,11 +65,91 @@ class OllamaLLM:
         return f"OllamaLLM(model={self._model})"
 
 
-def _get_llm():
-    """Return an OllamaLLM instance (created once, reused)."""
-    global _llm
+class ONNXLLM:
+    """ONNX Runtime implementation for Mac ANE"""
+    def __init__(self, model_path: str, n_ctx: int = 8192):
+        self._n_ctx = n_ctx
+        import onnxruntime_genai as og
+        print(f"[LLM] Loading ONNX model from {model_path} with CoreMLExecutionProvider")
+        self.model = og.Model(model_path)
+        self.tokenizer = og.Tokenizer(self.model)
+
+    def n_ctx(self) -> int:
+        return self._n_ctx
+
+    def tokenize(self, text: bytes, add_bos: bool = False) -> list:
+        return self.tokenizer.encode(text.decode("utf-8"))
+
+    def __call__(self, prompt: str, max_tokens: int = 1200, temperature: float = 0.15, **_kw) -> dict:
+        import onnxruntime_genai as og
+        tokens = self.tokenizer.encode(prompt)
+        params = og.GeneratorParams(self.model)
+        params.set_search_options({"max_length": len(tokens) + max_tokens, "temperature": temperature})
+        params.input_ids = tokens
+
+        output_tokens = self.model.generate(params)
+        generated_tokens = output_tokens[0][len(tokens):]
+        text = self.tokenizer.decode(generated_tokens)
+        return {"choices": [{"text": text}]}
+
+    def __repr__(self):
+        return "ONNXLLM(ANE)"
+
+
+class OpenVINOLLM:
+    """OpenVINO implementation for Intel Ultra Gen1 NPU"""
+    def __init__(self, model_path: str, n_ctx: int = 8192):
+        self._n_ctx = n_ctx
+        import openvino_genai as ov_genai
+        print(f"[LLM] Loading OpenVINO model from {model_path} on NPU")
+        self.pipe = ov_genai.LLMPipeline(model_path, "NPU")
+
+    def n_ctx(self) -> int:
+        return self._n_ctx
+
+    def tokenize(self, text: bytes, add_bos: bool = False) -> list:
+        return [0] * (len(text) // 4)
+
+    def __call__(self, prompt: str, max_tokens: int = 1200, temperature: float = 0.15, **_kw) -> dict:
+        import openvino_genai as ov_genai
+        config = ov_genai.GenerationConfig()
+        config.max_new_tokens = max_tokens
+        config.temperature = temperature
+
+        output = self.pipe.generate(prompt, config)
+        return {"choices": [{"text": output}]}
+
+    def __repr__(self):
+        return "OpenVINOLLM(NPU)"
+
+
+_llm_npu = None
+
+def _get_llm(npu_mode: bool = False):
+    """Return an LLM instance. If npu_mode is True, use platform specific NPU inference."""
+    global _llm, _llm_npu
+    from config import OLLAMA_URL, OLLAMA_MODEL, LLM_CONTEXT_SIZE
+
+    if npu_mode:
+        if _llm_npu is None:
+            import platform
+            sys_os = platform.system()
+            print(f"[LLM] NPU mode requested. Detected OS: {sys_os}")
+            try:
+                if sys_os == "Darwin":
+                    print("[LLM] Initializing ONNX runtime for ANE...")
+                    _llm_npu = ONNXLLM("models/onnx", n_ctx=LLM_CONTEXT_SIZE)
+                else:
+                    print("[LLM] Initializing OpenVINO for Intel NPU...")
+                    _llm_npu = OpenVINOLLM("models/openvino", n_ctx=LLM_CONTEXT_SIZE)
+            except Exception as e:
+                print(f"[LLM] Error initializing NPU inference: {e}")
+                print("[LLM] Falling back to OllamaLLM for development purposes...")
+                import requests
+                _llm_npu = OllamaLLM(base_url=OLLAMA_URL, model=OLLAMA_MODEL, n_ctx=LLM_CONTEXT_SIZE)
+        return _llm_npu
+
     if _llm is None:
-        from config import OLLAMA_URL, OLLAMA_MODEL, LLM_CONTEXT_SIZE
         import requests
 
         print(f"[LLM] Connecting to Ollama at {OLLAMA_URL}, model={OLLAMA_MODEL}")
@@ -140,7 +220,7 @@ async def run_pipeline(body: PipelineRequest):
                 "reason": f"low confidence ({retrieval['top_score']:.2f})",
             }
         )
-        chunks = resolve_and_retrieve(transcript, _get_llm(), retrieve)
+        chunks = resolve_and_retrieve(transcript, _get_llm(body.npu_mode), retrieve)
         print(f"[PIPELINE] Step 4b — Vagueness resolve: {time.time()-t0:.2f}s  expanded to {len(chunks)} chunks")
 
     # Step 5 — RAG triage
@@ -151,7 +231,7 @@ async def run_pipeline(body: PipelineRequest):
         "chunks ready",
         {"chunk_count": len(chunks)},
     )
-    llm = _get_llm()
+    llm = _get_llm(body.npu_mode)
     situations = run_rag_triage(transcript, chunks, llm)
     print(f"[PIPELINE] Step 5 — RAG triage (LLM):   {time.time()-t0:.2f}s  {len(situations)} situations")
     for i, s in enumerate(situations):
