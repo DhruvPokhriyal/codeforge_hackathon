@@ -62,6 +62,31 @@ def get_volunteer_count() -> int:
     return len(VOLUNTEERS)
 
 
+# Reference to priority_queue — set via init_dispatch(queue)
+_queue = None
+
+
+def init_dispatch(queue) -> None:
+    """Register the priority queue so dispatch_all can be called anywhere."""
+    global _queue
+    _queue = queue
+
+
+def dispatch_all(queue=None) -> list:
+    """Assign ALL pending tasks to available volunteers in priority order
+    (critical → low). Returns list of assignment dicts."""
+    q = queue or _queue
+    if not q:
+        return []
+    assignments = []
+    while True:
+        result = dispatch(q)
+        if result is None:
+            break
+        assignments.append(result)
+    return assignments
+
+
 def get_free_volunteer() -> str | None:
     """Return the ID of the first AVAILABLE volunteer, or None."""
     for vid, info in VOLUNTEERS.items():
@@ -164,5 +189,5 @@ def volunteer_return(
         "items_taken": [],
     }
 
-    # NOTE: We intentionally do NOT auto-dispatch here.
-    # The shelter head must manually trigger the next assignment.
+    # Auto-dispatch: assign pending tasks to all available volunteers
+    dispatch_all(queue)

@@ -15,7 +15,7 @@ import uuid
 from fastapi import APIRouter, HTTPException
 
 from schemas import ApproveRequest, ApproveResponse, OverrideRequest, OverrideResponse
-from core import priority_queue, request_store, dispatch, VOLUNTEERS, inventory as _inventory
+from core import priority_queue, request_store, dispatch_all, VOLUNTEERS, inventory as _inventory
 from config import SCALE_FACTOR
 
 
@@ -79,9 +79,9 @@ async def approve_request(body: ApproveRequest):
         body.request_id, {"heap_key": best_key, "situations": situations}
     )
 
-    # Push to priority heap and dispatch
+    # Push to priority heap and dispatch all pending to available volunteers
     priority_queue.push(request_store.get(body.request_id))
-    dispatch(priority_queue)
+    dispatch_all(priority_queue)
 
     return ApproveResponse(
         request_id=body.request_id,
@@ -168,7 +168,7 @@ async def approve_override(body: OverrideRequest):
     request_store.add(override_request)
     request_store.update(body.source_request_id, {"status": "OVERRIDDEN"})
     priority_queue.push(request_store.get(new_request_id))
-    dispatch(priority_queue)
+    dispatch_all(priority_queue)
 
     return OverrideResponse(
         request_id=new_request_id,

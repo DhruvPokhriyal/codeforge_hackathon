@@ -28,6 +28,7 @@ from routers import (
 # Import core components
 from core.escalation_scheduler import start_scheduler
 from core.priority_queue import priority_queue
+from core.dispatch_engine import init_dispatch
 
 # Import agent utilities
 from agents.retrieval_agent import build_index
@@ -95,6 +96,9 @@ async def on_startup():
     # STEP 2: Start the urgency escalation background job
     # Pass the priority queue instance so scheduler can update request priorities
     start_scheduler(priority_queue)
+
+    # STEP 3: Initialize dispatch engine with the priority queue
+    init_dispatch(priority_queue)
 
 
 # ── Health Check Endpoint ─────────────────────────────────────────────────────

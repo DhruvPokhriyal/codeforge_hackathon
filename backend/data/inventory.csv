@@ -9,13 +9,15 @@ Sterile Gauze,23,7,30,A-03,Medical
 Antiseptic Wipes,49,1,50,A-03,Medical
 Nitrile Gloves (pair),39,1,40,A-04,PPE
 Thermal Blanket,8,2,10,B-01,Comfort
-Water Bottle 500ml,58,2,60,B-02,Nutrition
+Water Bottle 500ml,56,4,60,B-02,Nutrition
 Energy Bar,39,1,40,B-02,Nutrition
-Insulin Kit,4,8,12,C-01,Medical
+Insulin Kit,3,9,12,C-01,Medical
 EpiPen,3,0,3,C-01,Medical
 Oxygen Mask,1,1,2,C-02,Medical
 Blood Pressure Monitor,2,0,2,C-03,Medical
 Glucose Tablets,20,0,20,C-01,Medical
-Stretcher,0,2,2,D-01,Equipment
+Stretcher,1,2,2,D-01,Equipment
 Wheelchair,0,1,1,D-02,Equipment
 Flashlight,6,2,8,D-03,Equipment
+kartik,1,0,1,NEW,General
+dhruv,10,0,10,NEW,General

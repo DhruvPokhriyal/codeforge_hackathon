@@ -7,11 +7,14 @@
 # the in-memory DataFrame stays in sync.
 #
 # Public interface (class InventoryManager):
-#   reserve(item_name, quantity) -> bool   — decrement Available, increment Reserved
-#   restore(item_name, quantity) -> None   — increment Available, decrement Reserved
-#   daily_refill() -> None                 — full reset: Available = Total, Reserved = 0
-#   partial_refill() -> None               — refill items at ≤ 60% capacity
-#   get_all() -> list[dict]                — serialisable snapshot of the CSV
+#   reserve(item_name, quantity) -> bool
+#   restore(item_name, quantity) -> dict    — returns to inventory or buffer
+#   update_item(item_name, quantity) -> dict — add stock respecting capacity
+#   create_item(item_name, capacity, bin_location, category) -> dict
+#   daily_refill() -> None
+#   partial_refill() -> None
+#   get_all() -> list[dict]
+#   get_buffer() -> list[dict]
 
 import pandas as pd
 from rapidfuzz import process, fuzz
@@ -20,6 +23,12 @@ from config import INVENTORY_CSV
 
 REFILL_THRESHOLD = 0.60
 _FUZZY_MIN_SCORE = 55
+
+# ── Buffer Inventory ──────────────────────────────────────────────────────────
+# When returned items can't fit back into the main inventory (already at Total),
+# they go here. Buffer starts at 100 capacity and expands dynamically.
+_BUFFER: dict[str, dict] = {}   # { item_name: { "quantity": int, "capacity": int } }
+_BUFFER_DEFAULT_CAP = 100
 
 
 class InventoryManager:
@@ -57,14 +66,81 @@ class InventoryManager:
         self._save()
         return True
 
-    def restore(self, item_name: str, quantity: int) -> None:
-        """Increment Available, decrement Reserved (floor at 0)."""
+    def restore(self, item_name: str, quantity: int) -> dict:
+        """Return items to inventory. If main inventory is full, overflow goes to buffer.
+        Returns {"restored": int, "buffered": int}."""
         idx = self._find(item_name)
         if idx is None:
-            return
+            # Unknown item — put everything in buffer
+            self._add_to_buffer(item_name, quantity)
+            return {"restored": 0, "buffered": quantity}
+
+        available = int(self.df.at[idx, "Available"])
+        total = int(self.df.at[idx, "Total"])
+        reserved = int(self.df.at[idx, "Reserved"])
+
+        space = total - available
+        can_restore = min(quantity, space)
+        overflow = quantity - can_restore
+
+        if can_restore > 0:
+            self.df.at[idx, "Available"] += can_restore
+            self.df.at[idx, "Reserved"] = max(0, reserved - can_restore)
+            self._save()
+
+        if overflow > 0:
+            self._add_to_buffer(item_name, overflow)
+
+        return {"restored": can_restore, "buffered": overflow}
+
+    def update_item(self, item_name: str, quantity: int) -> dict:
+        """Add stock to an existing item, respecting capacity (Total).
+        Returns {"ok": bool, "error": str|None, "available": int, "total": int}."""
+        idx = self._find(item_name)
+        if idx is None:
+            # Item doesn't exist — create it as a new item
+            return self.create_item(item_name, quantity)
+
+        available = int(self.df.at[idx, "Available"])
+        total = int(self.df.at[idx, "Total"])
+        space = total - available
+
+        if quantity > space:
+            return {
+                "ok": False,
+                "error": f"Not enough space in inventory. {available}/{total} — only {space} free slots.",
+                "available": available,
+                "total": total,
+            }
+
         self.df.at[idx, "Available"] += quantity
-        self.df.at[idx, "Reserved"] = max(0, self.df.at[idx, "Reserved"] - quantity)
         self._save()
+        return {
+            "ok": True,
+            "error": None,
+            "available": int(self.df.at[idx, "Available"]),
+            "total": total,
+        }
+
+    def create_item(self, item_name: str, capacity: int,
+                     bin_location: str = "NEW", category: str = "General") -> dict:
+        """Create a brand-new inventory item with Available = Total = capacity."""
+        new_row = pd.DataFrame([{
+            "Item": item_name,
+            "Available": capacity,
+            "Reserved": 0,
+            "Total": capacity,
+            "Bin Location": bin_location,
+            "Category": category,
+        }])
+        self.df = pd.concat([self.df, new_row], ignore_index=True)
+        self._save()
+        return {
+            "ok": True,
+            "error": None,
+            "available": capacity,
+            "total": capacity,
+        }
 
     def daily_refill(self) -> None:
         """Full overnight reset — Available = Total, Reserved = 0."""
@@ -82,32 +158,18 @@ class InventoryManager:
                 self.df.at[idx, "Available"] = row["Total"]
         self._save()
 
-    def update_item(self, item_name: str, quantity: int) -> bool:
-        """Add *quantity* units of *item_name* to Available and Total.
-        If the item doesn't exist, create a new row.
-        Returns True on success."""
-        idx = self._find(item_name)
-        if idx is not None:
-            self.df.at[idx, "Available"] += quantity
-            self.df.at[idx, "Total"] += quantity
-        else:
-            import pandas as pd
-            new_row = pd.DataFrame([{
-                "Item": item_name,
-                "Available": quantity,
-                "Reserved": 0,
-                "Total": quantity,
-                "Bin Location": "NEW",
-                "Category": "General",
-            }])
-            self.df = pd.concat([self.df, new_row], ignore_index=True)
-        self._save()
-        return True
-
     def get_all(self) -> list:
         """Return inventory as a list of dicts (safe for JSON serialisation)."""
         import numpy as np
         return self.df.replace({np.nan: None}).to_dict(orient="records")
+
+    def get_buffer(self) -> list:
+        """Return buffer inventory as a list of dicts."""
+        return [
+            {"item": name, "quantity": info["quantity"], "capacity": info["capacity"]}
+            for name, info in _BUFFER.items()
+            if info["quantity"] > 0
+        ]
 
     # ── Internal helpers ──────────────────────────────────────────────────────
 
@@ -123,3 +185,15 @@ class InventoryManager:
 
     def _save(self) -> None:
         self.df.to_csv(self._path, index=False)
+
+    @staticmethod
+    def _add_to_buffer(item_name: str, quantity: int) -> None:
+        """Add overflow items to the buffer. Capacity expands dynamically."""
+        if item_name not in _BUFFER:
+            _BUFFER[item_name] = {"quantity": 0, "capacity": _BUFFER_DEFAULT_CAP}
+        buf = _BUFFER[item_name]
+        buf["quantity"] += quantity
+        # Expand capacity if needed
+        if buf["quantity"] > buf["capacity"]:
+            buf["capacity"] = buf["quantity"]
+        print(f"[INVENTORY] Buffer: {item_name} now {buf['quantity']}/{buf['capacity']}")
