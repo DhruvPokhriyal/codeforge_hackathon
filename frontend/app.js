@@ -112,6 +112,26 @@ let currentNpuMode = false;
   });
 })();
 
+// ── NPU/CPU Switcher ────────────────────────────────────────────────────────────
+let currentNpuMode = false;
+(function initNpuMode() {
+  const savedMode = localStorage.getItem('dl-npu') || 'cpu';
+  currentNpuMode = savedMode === 'npu';
+
+  document.querySelectorAll('.npu-btn').forEach(btn => {
+    btn.classList.remove('active');
+    if (btn.dataset.mode === savedMode) btn.classList.add('active');
+
+    btn.addEventListener('click', () => {
+      const mode = btn.dataset.mode;
+      currentNpuMode = mode === 'npu';
+      document.querySelectorAll('.npu-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      localStorage.setItem('dl-npu', mode);
+    });
+  });
+})();
+
 // ── Render: Inventory ──────────────────────────────────────────────────────────
 function renderInventory() {
   const el = document.getElementById('inventory-list');
@@ -208,29 +228,22 @@ function renderAiPanel() {
   const content = document.getElementById('ai-panel-content');
   if (!content) return;
 
-  console.log('[renderAiPanel] mode:', aiPanelMode, 'CURRENT_PIPELINE:', !!CURRENT_PIPELINE);
 
   updateAiModeUi();
   updateAiActionsVisibility();
 
   if (aiPanelMode === 'incoming') {
     if (!CURRENT_PIPELINE) {
-      console.log('[renderAiPanel] CURRENT_PIPELINE is null/undefined');
       content.innerHTML = '<div class="ai-no-selection">No incoming task awaiting approval.</div>';
       return;
     }
 
-    console.log('[renderAiPanel] CURRENT_PIPELINE keys:', Object.keys(CURRENT_PIPELINE));
-    console.log('[renderAiPanel] CURRENT_PIPELINE.situations:', typeof CURRENT_PIPELINE.situations, Array.isArray(CURRENT_PIPELINE.situations), 'length:', CURRENT_PIPELINE.situations?.length);
-    console.log('[renderAiPanel] CURRENT_PIPELINE.situations value:', JSON.stringify(CURRENT_PIPELINE.situations)?.substring(0, 1000));
 
     const sit = CURRENT_PIPELINE.situations?.[0];
     if (!sit) {
-      console.log('[renderAiPanel] sit is falsy! situations[0]:', CURRENT_PIPELINE.situations?.[0]);
       content.innerHTML = '<div class="ai-no-selection">No situations returned from pipeline.</div>';
       return;
     }
-    console.log('[renderAiPanel] sit.label:', sit.label, 'sit.severity:', sit.severity);
     const priority = sit.severity || 'HIGH';
     const severityCls = priority === 'CRITICAL' ? 'critical-text' : 'high-text';
 
@@ -914,9 +927,9 @@ async function bootstrapApp() {
         const resp = await window.api.getQueue();
         const newQueue = resp.queue || [];
         // Maintain timers only for active (non-resolved) requests
-        const activeIds = newQueue.filter(r => r.status !== 'RESOLVED').map(r => r.request_id);
+        const activeIds = new Set(newQueue.filter(r => r.status !== 'RESOLVED').map(r => r.request_id));
         Object.keys(REQUEST_TIMERS).forEach(id => {
-          if (!activeIds.includes(id)) {
+          if (!activeIds.has(id)) {
             delete REQUEST_TIMERS[id];
           }
         });

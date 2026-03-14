@@ -136,13 +136,14 @@ body {
   line-height: 1.45;
 }
 
-/* ── Theme Switcher ───────────────────────────────────────────── */
+/* ── Theme Switcher (bottom-left) ───────────────────────────────────────────── */
 .switchers-container {
+  position: fixed;
+  bottom: 14px;
+  left: 14px;
+  z-index: 200;
   display: flex;
-  flex-direction: row;
-  justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 15px;
+  flex-direction: column;
 }
 
 .theme-switcher {
@@ -189,6 +190,7 @@ html[data-theme="hc"] .theme-btn {
   display: flex;
   gap: 0;
   border: 1px solid var(--border-strong);
+  margin-top: 5px;
 }
 
 
@@ -332,21 +334,21 @@ html[data-theme="hc"] .divider {
 
 /* ── Inventory List ──────────────────────────────────────────────────────────── */
 .inventory-list {
-  height: 50%;
+  height: 30%;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   margin-bottom: 2px;
 }
 
-.inv-item {}
+
 
 .inv-item-header {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  margin-bottom: 4px;
+  margin-bottom: 3px;
 }
 
 .inv-name {
@@ -382,8 +384,8 @@ html[data-theme="hc"] .divider {
 .inv-pct-row {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-top: 3px;
+  gap: 6px;
+  margin-top: 2px;
 }
 
 .inv-pct {
