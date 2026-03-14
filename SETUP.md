@@ -89,16 +89,14 @@ Key install notes:
 sudo apt install -y ffmpeg
 
 pip install torch --index-url https://download.pytorch.org/whl/cpu
-pip install llama-cpp-python --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cpu
 pip install -r requirements.txt
 ```
 
-> ⏱️ Takes 10–20 minutes. Downloads ~2.5 GB of packages including PyTorch.
+> ⏱️ Takes 10–20 minutes. Downloads ~1.5 GB of packages including PyTorch.
 
 ### Verify installs
 ```bash
 python -c "import whisper; print('whisper ✅')"
-python -c "from llama_cpp import Llama; print('llama-cpp ✅')"
 python -c "import noisereduce; print('noisereduce ✅')"
 python -c "import fastapi; print('fastapi ✅')"
 python -c "from llama_index.core import VectorStoreIndex; print('llama-index ✅')"
@@ -142,27 +140,14 @@ Minimum `package.json`:
 python -c "import whisper; whisper.load_model('base'); print('Whisper base ✅')"
 ```
 
-### Model 2: Gemma 3 1B Q5_K_M GGUF (manual)
-**Size:** ~0.9 GB
+### Model 2: Gemma 3 1B (via Ollama)
+**Size:** ~1 GB
+
+Ensure you have [Ollama installed](https://ollama.com/), then run:
 
 ```bash
-mkdir -p models
-
-python -c "
-from huggingface_hub import hf_hub_download
-hf_hub_download(
-  repo_id='bartowski/gemma-3-1b-it-GGUF',
-  filename='gemma-3-1b-it-Q5_K_M.gguf',
-    local_dir='./models'
-)
-print('Gemma ✅')
-"
+ollama pull gemma3:1b
 ```
-
-**Alternative:**
-```bash
-wget -P ./models \
-  "https://huggingface.co/bartowski/gemma-3-1b-it-GGUF/resolve/main/gemma-3-1b-it-Q5_K_M.gguf"
 ```
 
 ### Model 3: all-MiniLM-L6-v2 (auto on first use)
@@ -263,7 +248,6 @@ API explorer: `http://127.0.0.1:8000/docs`
 | `noisereduce` | 3.0.2 | Stationary audio denoising |
 | `denoiser` | 0.1.5 | Facebook dns64 neural denoiser |
 | `torch` + `torchaudio` | 2.3.1 | Facebook denoiser dependency |
-| `llama-cpp-python` | 0.2.90 | GGUF LLM on CPU (vagueness + triage) |
 | `llama-index` | 0.10.68 | RAG framework (retrieval + vector store) |
 | `llama-index-embeddings-huggingface` | 0.2.3 | HuggingFace embedding integration |
 | `sentence-transformers` | 3.0.1 | all-MiniLM-L6-v2 embedding model |
@@ -292,7 +276,7 @@ API explorer: `http://127.0.0.1:8000/docs`
 | Model | Location | Size | How Downloaded |
 |-------|----------|------|----------------|
 | `whisper-base` | `~/.cache/whisper/` | 140 MB | Auto |
-| `gemma-3-1b-it-Q5_K_M.gguf` | `./models/` | ~0.9 GB | Manual (Step 4) |
+| `gemma-3:1b` | `Ollama` | ~1 GB | Manual (Step 4) |
 | `all-MiniLM-L6-v2` | `~/.cache/huggingface/` | 80 MB | Auto |
 | `facebook dns64` | `~/.cache/torch/hub/` | ~90 MB | Auto |
 
@@ -301,12 +285,6 @@ API explorer: `http://127.0.0.1:8000/docs`
 ---
 
 ## Troubleshooting
-
-### `llama-cpp-python` build fails
-```bash
-CMAKE_ARGS="-DLLAMA_BLAS=ON -DLLAMA_BLAS_VENDOR=OpenBLAS" \
-pip install llama-cpp-python --no-cache-dir
-```
 
 ### `torch` install too large / slow
 ```bash
@@ -324,7 +302,7 @@ python -c "from backend.agents.retrieval_agent import build_index; build_index()
 pip install APScheduler==3.10.4 --force-reinstall
 ```
 
-### Out of RAM during LLM inference
+### Out of RAM during SLM inference
 ```python
 # triage_agent.py — reduce context
 llm = Llama(model_path="...", n_ctx=1024, n_threads=2, n_gpu_layers=0)

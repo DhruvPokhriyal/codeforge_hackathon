@@ -65,25 +65,8 @@ Expected response:
 ### 5) If startup fails
 
 - Port already in use: `pkill -f "backend/main.py|electron"` and start again.
-- Missing LLM model: place `gemma-3-1b-it-Q5_K_M.gguf` in `backend/models/`.
+- Missing SLM model: ensure Ollama is running (`ollama serve`) and the model is pulled (`ollama pull gemma3:1b`).
 - `ffmpeg` missing: install system package (`sudo apt install ffmpeg -y` on Ubuntu).
-
-### 6) NPU Mode Setup
-
-To save power, you can run LLM inference on your local Neural Processing Unit (NPU) by toggling "NPU" in the UI.
-- On **Macs**, this uses ONNX Runtime on the Apple Neural Engine (ANE).
-- On **Windows/Linux Intel machines**, this uses OpenVINO on the Intel Ultra Gen1 NPU.
-
-**Setup Script:**
-Before using NPU mode, you must run the included helper script to generate the proper ONNX or OpenVINO model format from HuggingFace.
-
-```bash
-pip install optimum[openvino,onnxruntime] transformers
-python backend/setup_npu_models.py
-```
-This script will automatically detect your OS and export the `gemma-3-1b-it` model to the correct directory (`backend/models/onnx` or `backend/models/openvino`).
-
----
 
 ## 🔄 Complete System Workflow
 
@@ -121,10 +104,10 @@ This script will automatically detect your OS and export the `gemma-3-1b-it` mod
                 │ (clear, conf ≥ 0.8)      │ (vague, conf < 0.8)
                 │                          ▼
                 │          ┌───────────────────────────────────────────┐
-                │          │  STEP 4b — LLM VAGUENESS RESOLVER         │
+                │          │  STEP 4b — SLM VAGUENESS RESOLVER         │
                 │          │  "my neighbour uncle is not moving and     │
                 │          │   his legs look wrong"                     │
-                │          │  LLM generates possible diagnoses at       │
+                │          │  SLM generates possible diagnoses at       │
                 │          │  each criticality level:                   │
                 │          │    CRITICAL: cardiac arrest, stroke        │
                 │          │    HIGH: fracture + shock                  │
@@ -136,8 +119,8 @@ This script will automatically detect your OS and export the `gemma-3-1b-it` mod
                                │ retrieved chunks (with source refs)
                                ▼
 ┌──────────────────────────────────────────────────────────────────────┐
-│  STEP 5 — RAG LLM + TRIAGE                [FastAPI Backend]          │
-│  LLM reads retrieved chunks + transcript                             │
+│  STEP 5 — RAG SLM + TRIAGE                [FastAPI Backend]          │
+│  SLM reads retrieved chunks + transcript                             │
 │  Outputs a structured report listing MULTIPLE situation possibilities│
 │  Each possibility includes:                                          │
 │    · Situation label + severity (CRITICAL / HIGH / MEDIUM / LOW)    │
@@ -235,7 +218,7 @@ heap_key = severity_base_score × scale_factor
 
 scale_factor = 1000 (to ensure time penalties are significant but don't overshadow severity)
 
-**Travel time and resolution time** are estimated by the RAG LLM per situation and penalise key (harder to reach = lower initial priority vs equally severe but reachable case). Buffer time is added at every escalation step: `buffer = f(travel_time, resolution_time)`.
+**Travel time and resolution time** are estimated by the RAG SLM per situation and penalise key (harder to reach = lower initial priority vs equally severe but reachable case). Buffer time is added at every escalation step: `buffer = f(travel_time, resolution_time)`.
 
 ---
 
@@ -276,7 +259,7 @@ Transcript: "my neighbour uncle is not moving and his legs look wrong"
                ↓
   Top retrieval confidence = 0.43  →  VAGUE
                ↓
-  LLM Vagueness Resolver generates hypotheses:
+  SLM Vagueness Resolver generates hypotheses:
     CRITICAL: cardiac arrest, stroke, internal bleeding
     HIGH:     severe fracture with shock, spinal injury
     MEDIUM:   faint, seizure, diabetic episode
@@ -286,7 +269,7 @@ Transcript: "my neighbour uncle is not moving and his legs look wrong"
                ↓
   Merge top chunks across all hypotheses
                ↓
-  RAG LLM generates multi-situation report (all possibilities)
+  RAG SLM generates multi-situation report (all possibilities)
 ```
 
 ---
@@ -439,8 +422,8 @@ DISPLAY:
 | Audio Denoising | `noisereduce` + Facebook Denoiser (benchmarked) | Shelter noise removal |
 | Speech-to-Text | `openai-whisper` base | Audio → transcript |
 | RAG Retrieval | `LlamaIndex` + `all-MiniLM-L6-v2` | Semantic PDF search with confidence scores |
-| Vagueness Resolver | Gemma 3 1B GGUF | Expands vague queries into hypotheses |
-| RAG LLM + Triage | Gemma 3 1B GGUF | Multi-situation report + severity + instructions |
+| Vagueness Resolver | Ollama (Gemma 3) | Expands vague queries into hypotheses |
+| RAG SLM + Triage | Ollama (Gemma 3) | Multi-situation report + severity + instructions |
 | Heap Key Escalation | APScheduler + custom formula | Exponential urgency escalation |
 | Priority Queue | Python `heapq` | Max-heap with dynamic key escalation |
 | Dispatch Engine | Custom Python scheduler | Volunteer assignment, timer, return flow |
@@ -462,7 +445,7 @@ emergency-hub/
 │   ├── core/           priority_queue · dispatch_engine · escalation_scheduler · request_store
 │   └── utils/          logger · audio_utils · inventory_manager
 ├── data/               inventory.csv · protocols/*.pdf
-├── models/             Gemma GGUF
+├── models/             Ollama model (managed externally)
 └── vector_store/       auto-generated LlamaIndex index
 ```
 
@@ -474,7 +457,8 @@ emergency-hub/
 git clone https://github.com/your-team/emergency-hub.git && cd emergency-hub
 python -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
-python scripts/download_models.py   # downloads Gemma + Whisper + MiniLM
+python scripts/download_models.py   # downloads Whisper + MiniLM
+ollama pull gemma3:1b               # downloads Gemma via Ollama
 npm install
 npm start
 ```

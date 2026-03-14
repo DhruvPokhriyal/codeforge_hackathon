@@ -78,11 +78,11 @@ emergency-hub/
 │   │   ├── retrieval_agent.py           # STEP 4: LlamaIndex retrieval
 │   │   │                                #   · Returns top-k chunks + confidence scores
 │   │   │                                #   · Sets is_vague flag if top_score < 0.8
-│   │   ├── vagueness_agent.py           # STEP 4b: LLM hypothesis expansion
+│   │   ├── vagueness_agent.py           # STEP 4b: SLM hypothesis expansion
 │   │   │                                #   · Generates 2-3 conditions per severity level
 │   │   │                                #   · Retries retrieval for each hypothesis
 │   │   │                                #   · Merges and deduplicates chunks
-│   │   ├── rag_triage_agent.py          # STEP 5: RAG LLM + Triage
+│   │   ├── rag_triage_agent.py          # STEP 5: RAG SLM + Triage
 │   │   │                                #   · Reads transcript + retrieved chunks
 │   │   │                                #   · Outputs multi-situation JSON array
 │   │   │                                #   · Each situation: label, severity, score,

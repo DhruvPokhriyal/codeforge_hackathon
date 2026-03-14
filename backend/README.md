@@ -32,16 +32,11 @@ poetry install
 ### 1.3. Download models & prepare data
 
 1. **Gemma model**  
-  Place `gemma-3-1b-it-Q5_K_M.gguf` in:
+  The system uses Ollama for local inference. Ensure you have pulled the model:
 
-   ```text
-   backend/models/
+   ```bash
+   ollama pull gemma3:1b
    ```
-
-   The default path is configured in `config.py`:
-
-   ```python
-  GEMMA_MODEL_PATH = MODELS_DIR / "gemma-3-1b-it-Q5_K_M.gguf"
    ```
 
 2. **Protocol PDFs (for RAG)**  
