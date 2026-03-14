@@ -8,8 +8,8 @@ Bandage Roll,15,5,20,A-03,Medical
 Sterile Gauze,29,1,30,A-03,Medical
 Antiseptic Wipes,49,1,50,A-03,Medical
 Nitrile Gloves (pair),39,1,40,A-04,PPE
-Thermal Blanket,9,1,10,B-01,Comfort
-Water Bottle 500ml,59,1,60,B-02,Nutrition
+Thermal Blanket,8,2,10,B-01,Comfort
+Water Bottle 500ml,58,2,60,B-02,Nutrition
 Energy Bar,39,1,40,B-02,Nutrition
 Insulin Kit,0,2,2,C-01,Medical
 EpiPen,3,0,3,C-01,Medical

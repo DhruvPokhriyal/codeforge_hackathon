@@ -112,25 +112,7 @@ let currentNpuMode = false;
   });
 })();
 
-// ── NPU/CPU Switcher ────────────────────────────────────────────────────────────
-let currentNpuMode = false;
-(function initNpuMode() {
-  const savedMode = localStorage.getItem('dl-npu') || 'cpu';
-  currentNpuMode = savedMode === 'npu';
 
-  document.querySelectorAll('.npu-btn').forEach(btn => {
-    btn.classList.remove('active');
-    if (btn.dataset.mode === savedMode) btn.classList.add('active');
-
-    btn.addEventListener('click', () => {
-      const mode = btn.dataset.mode;
-      currentNpuMode = mode === 'npu';
-      document.querySelectorAll('.npu-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      localStorage.setItem('dl-npu', mode);
-    });
-  });
-})();
 
 // ── Render: Inventory ──────────────────────────────────────────────────────────
 function renderInventory() {
