@@ -97,6 +97,7 @@ class PipelineRequest(BaseModel):
     """POST /pipeline — incoming distress audio as base64 string."""
 
     audio_b64: str  # base64-encoded .wav
+    npu_mode: bool = False
 
 
 class ApproveRequest(BaseModel):
