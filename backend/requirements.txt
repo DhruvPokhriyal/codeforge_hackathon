@@ -38,3 +38,4 @@ llama_cpp_python==0.3.16
 pandas==3.0.1
 RapidFuzz==3.14.3
 
+optimum[openvino,onnxruntime]
