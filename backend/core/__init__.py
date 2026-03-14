@@ -4,7 +4,14 @@
 
 from .priority_queue import priority_queue
 from .request_store import request_store
-from .dispatch_engine import VOLUNTEERS, dispatch, volunteer_return, get_free_volunteer
+from .dispatch_engine import (
+    VOLUNTEERS,
+    dispatch,
+    volunteer_return,
+    get_free_volunteer,
+    set_volunteer_count,
+    get_volunteer_count,
+)
 from utils.inventory_manager import InventoryManager
 
 # Shared inventory singleton — all routers must use this instance so that
@@ -19,4 +26,6 @@ __all__ = [
     "dispatch",
     "volunteer_return",
     "get_free_volunteer",
+    "set_volunteer_count",
+    "get_volunteer_count",
 ]

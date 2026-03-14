@@ -82,6 +82,28 @@ class InventoryManager:
                 self.df.at[idx, "Available"] = row["Total"]
         self._save()
 
+    def update_item(self, item_name: str, quantity: int) -> bool:
+        """Add *quantity* units of *item_name* to Available and Total.
+        If the item doesn't exist, create a new row.
+        Returns True on success."""
+        idx = self._find(item_name)
+        if idx is not None:
+            self.df.at[idx, "Available"] += quantity
+            self.df.at[idx, "Total"] += quantity
+        else:
+            import pandas as pd
+            new_row = pd.DataFrame([{
+                "Item": item_name,
+                "Available": quantity,
+                "Reserved": 0,
+                "Total": quantity,
+                "Bin Location": "NEW",
+                "Category": "General",
+            }])
+            self.df = pd.concat([self.df, new_row], ignore_index=True)
+        self._save()
+        return True
+
     def get_all(self) -> list:
         """Return inventory as a list of dicts (safe for JSON serialisation)."""
         import numpy as np

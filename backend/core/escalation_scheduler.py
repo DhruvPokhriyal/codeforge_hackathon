@@ -1,9 +1,10 @@
 # backend/core/escalation_scheduler.py
 # APScheduler Background Job — Urgency Escalation
 #
-# Runs every 60 seconds. For each PENDING request, calculates how many hours
-# it has been waiting and applies cumulative priority boosts per severity schedule.
-# Ensures that LOW-priority items eventually outrank CRITICAL ones if ignored.
+# Runs every 60 seconds. For each PENDING request:
+#   1. Applies cumulative priority boosts per severity schedule (heap_key).
+#   2. Promotes the severity LABEL when wait time exceeds thresholds:
+#        LOW → MEDIUM after 6 h, MEDIUM → HIGH after 4 h, HIGH → CRITICAL after 3 h.
 #
 # Public interface:
 #   start_scheduler(queue) -> None   — call once in FastAPI startup event
@@ -12,7 +13,7 @@ from datetime import datetime
 
 from apscheduler.schedulers.background import BackgroundScheduler
 
-from config import ESCALATION_INTERVAL_SECS
+from config import ESCALATION_INTERVAL_SECS, SCALE_FACTOR
 
 # Escalation schedule per severity:
 # Each entry: (hours_since_request, key_boost, buffer_multiplier)
@@ -39,30 +40,60 @@ ESCALATION_SCHEDULE: dict[str, list] = {
     ],
 }
 
+# Severity label promotion thresholds (hours).
+# If a request's INITIAL severity is X and it waits longer than the threshold,
+# promote its severity label (and score) to the next level.
+SEVERITY_PROMOTION: dict[str, tuple[float, str, int]] = {
+    "LOW":    (6.0,  "MEDIUM",   50),
+    "MEDIUM": (4.0,  "HIGH",     75),
+    "HIGH":   (3.0,  "CRITICAL", 100),
+}
+
 
 def _compute_buffer(travel_time: int, resolution_time: int, multiplier: float) -> float:
     return (travel_time + resolution_time) * multiplier
 
 
 def escalate_keys(queue) -> None:
-    """Apply time-based urgency boosts to all PENDING requests."""
+    """Apply time-based urgency boosts and severity promotions to all PENDING requests."""
     now = datetime.now()
     for req in queue.get_sorted():
         if req.get("status") != "PENDING":
             continue
 
-        severity = req["situations"][0]["severity"] if req.get("situations") else "LOW"
+        if not req.get("situations"):
+            continue
+
+        sit0 = req["situations"][0]
+        severity = sit0.get("severity", "LOW")
         t_req = datetime.fromisoformat(req["time_of_request"])
         hours_wait = (now - t_req).total_seconds() / 3600
 
+        # ── Severity label promotion ──────────────────────────────────────
+        promo = SEVERITY_PROMOTION.get(severity)
+        if promo:
+            threshold_h, new_severity, new_score = promo
+            if hours_wait >= threshold_h:
+                old_sev = severity
+                for s in req["situations"]:
+                    s["severity"] = new_severity
+                    s["severity_score"] = new_score
+                    # Recalculate heap_key with new score
+                    travel = s.get("travel_time_min", 10)
+                    resolve = s.get("resolution_time_min", 20)
+                    s["heap_key"] = float(new_score * SCALE_FACTOR - (travel * 2) - resolve)
+                severity = new_severity
+                print(f"[ESCALATION] {req['request_id']}: {old_sev} → {new_severity} (waited {hours_wait:.1f}h)")
+
+        # ── Heap key boost (existing logic) ───────────────────────────────
         schedule = ESCALATION_SCHEDULE.get(severity, [])
-        base_key = req["situations"][0]["heap_key"] if req.get("situations") else 0
+        base_key = sit0.get("heap_key", 0)
         escalation = 0.0
 
         for threshold_h, boost, buf_mult in schedule:
             if hours_wait >= threshold_h:
-                travel = req["situations"][0].get("travel_time_min", 10)
-                res = req["situations"][0].get("resolution_time_min", 20)
+                travel = sit0.get("travel_time_min", 10)
+                res = sit0.get("resolution_time_min", 20)
                 buffer = _compute_buffer(travel, res, buf_mult)
                 escalation = boost + buffer  # take highest matching tier
             else:

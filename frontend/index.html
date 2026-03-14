@@ -70,17 +70,44 @@
 
     </section>
 
-    <!-- ═══════════════ COLUMN 2 · Priority Queue ═══════════════ -->
+    <!-- ═══════════════ COLUMN 2 · Priority Queue (70%) + Controls (30%) ═══════════════ -->
     <section class="col col-queue">
 
-      <div class="queue-header-row">
-        <div class="queue-title">Active incidents</div>
-        <div class="queue-count">Count: <span id="incident-count">0</span></div>
-      </div>
-      <hr class="divider" />
+      <!-- === TOP: Active Incidents (70%) === -->
+      <div class="queue-top">
+        <div class="queue-header-row">
+          <div class="queue-title">Active incidents</div>
+          <div class="queue-count">Count: <span id="incident-count">0</span></div>
+        </div>
+        <hr class="divider" />
 
-      <div id="task-list">
-        <!-- Task cards rendered by app.js -->
+        <div id="task-list">
+          <!-- Task cards rendered by app.js -->
+        </div>
+      </div>
+
+      <!-- === BOTTOM: Controls (30%) === -->
+      <div class="queue-bottom">
+        <hr class="divider" />
+
+        <!-- Volunteer Count -->
+        <div class="section-label">VOLUNTEER COUNT</div>
+        <div class="control-row">
+          <input type="number" id="volunteer-count-input" class="control-input" min="1" max="20" placeholder="Count" />
+          <button class="btn btn-control" id="btn-set-volunteers">SET</button>
+        </div>
+        <div class="control-status" id="volunteer-count-status"></div>
+
+        <hr class="divider" />
+
+        <!-- Inventory Update -->
+        <div class="section-label">UPDATE INVENTORY</div>
+        <div class="control-row">
+          <input type="text" id="inv-update-item" class="control-input control-input-wide" placeholder="Item name" />
+          <input type="number" id="inv-update-qty" class="control-input" min="1" placeholder="Qty" />
+          <button class="btn btn-control" id="btn-update-inventory">ADD</button>
+        </div>
+        <div class="control-status" id="inv-update-status"></div>
       </div>
 
     </section>

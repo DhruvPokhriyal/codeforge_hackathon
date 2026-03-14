@@ -285,7 +285,92 @@ html[data-theme="hc"] .npu-btn {
 
 .col-queue {
   background: var(--bg);
+  overflow: hidden;        /* override parent's overflow-y:auto; we manage it ourselves */
 }
+
+/* === 70/30 split inside column 2 === */
+.queue-top {
+  flex: 0 0 70%;
+  overflow-y: auto;
+  min-height: 0;           /* needed for flex scroll */
+}
+
+.queue-bottom {
+  flex: 0 0 30%;
+  overflow-y: auto;
+  min-height: 0;
+  border-top: 2px solid var(--border-strong);
+  padding-top: 8px;
+}
+
+/* Control rows for volunteer count & inventory update */
+.control-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+  align-items: stretch;
+}
+
+.control-input {
+  flex: 0 0 80px;
+  padding: 8px 10px;
+  border: 2px solid var(--border);
+  background: var(--bg-input);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 700;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.control-input:focus {
+  border-color: var(--high);
+}
+
+.control-input-wide {
+  flex: 1 1 auto;
+}
+
+.btn-control {
+  padding: 8px 18px;
+  border: 2px solid var(--btn-approve-col);
+  background: var(--btn-approve-col);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  font-family: var(--font-ui);
+  transition: opacity 0.15s, transform 0.1s;
+  white-space: nowrap;
+}
+
+.btn-control:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.btn-control:active {
+  transform: translateY(0);
+}
+
+.btn-control:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.control-status {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+  min-height: 18px;
+  font-family: var(--font-mono);
+}
+
 
 /* ── Dividers ────────────────────────────────────────────────────────────────── */
 .divider {

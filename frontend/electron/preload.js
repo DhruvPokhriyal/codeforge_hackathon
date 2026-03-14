@@ -13,6 +13,8 @@
 //   window.api.getQueue()                             → GET /queue
 //   window.api.getVolunteers()                        → GET /volunteers
 //   window.api.getInventory()                         → GET /inventory
+//   window.api.setVolunteerCount(count)               → POST /volunteers/count
+//   window.api.updateInventory(item, quantity)         → POST /inventory/update
 
 const { contextBridge } = require("electron");
 const http = require("http");
@@ -47,8 +49,14 @@ function apiCall(method, path, body = null) {
                 data += chunk;
             });
             res.on("end", () => {
+                console.log(`[preload] ${method} ${path} => status=${res.statusCode}, body length=${data.length}`);
                 try {
                     const parsed = data ? JSON.parse(data) : {};
+                    if (path === '/pipeline') {
+                        console.log('[preload] /pipeline response keys:', Object.keys(parsed));
+                        console.log('[preload] /pipeline situations type:', typeof parsed.situations, 'isArray:', Array.isArray(parsed.situations), 'length:', parsed.situations?.length);
+                        console.log('[preload] /pipeline situations[0]:', JSON.stringify(parsed.situations?.[0])?.substring(0, 500));
+                    }
                     if (res.statusCode >= 400) {
                         const msg = parsed?.detail || `HTTP ${res.statusCode}`;
                         reject(new Error(msg));
@@ -88,6 +96,12 @@ contextBridge.exposeInMainWorld("api", {
 
     volunteerReturn: (volunteer_id, returned_items) =>
         apiCall("POST", "/volunteer/return", { volunteer_id, returned_items }),
+
+    setVolunteerCount: (count) =>
+        apiCall("POST", "/volunteers/count", { count }),
+
+    updateInventory: (item, quantity) =>
+        apiCall("POST", "/inventory/update", { item, quantity }),
 
     getQueue: () => apiCall("GET", "/queue"),
     getVolunteers: () => apiCall("GET", "/volunteers"),

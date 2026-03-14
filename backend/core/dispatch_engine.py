@@ -1,7 +1,8 @@
 # backend/core/dispatch_engine.py
 # Volunteer Dispatch Engine
 #
-# Manages the AVAILABLE → BUSY state machine for 6 volunteers (V-01 to V-06).
+# Manages the AVAILABLE → BUSY state machine for volunteers.
+# Volunteer count is dynamic — controlled via POST /volunteers/count.
 # Assigns the highest-priority PENDING request to the first free volunteer.
 # Timer is set to travel_time + resolution_time but does NOT auto-reassign
 # when it hits 0 — the shelter head must manually click "Back at Base".
@@ -11,22 +12,54 @@
 #   get_free_volunteer() -> str | None
 #   dispatch(queue) -> dict | None         — assign free vol to top PENDING
 #   volunteer_return(volunteer_id, returned_items, queue, inventory_mgr) -> None
+#   set_volunteer_count(n) -> None         — resize the volunteer pool
+#   get_volunteer_count() -> int
 
 from datetime import datetime, timedelta
 
 from config import VOLUNTEER_COUNT
 
-# ── Volunteer state store ─────────────────────────────────────────────────────
-VOLUNTEERS: dict[str, dict] = {
-    f"V-{i:02d}": {
+def _new_vol() -> dict:
+    """Create a fresh AVAILABLE volunteer dict (avoids shared mutable lists)."""
+    return {
         "status": "AVAILABLE",
         "request_id": None,
         "assigned_at": None,
         "expected_return": None,
         "items_taken": [],
     }
+
+# ── Volunteer state store ─────────────────────────────────────────────────────
+VOLUNTEERS: dict[str, dict] = {
+    f"V-{i:02d}": _new_vol()
     for i in range(1, VOLUNTEER_COUNT + 1)
 }
+
+
+def set_volunteer_count(n: int) -> None:
+    """Resize the volunteer pool to exactly *n* slots.
+    New slots are AVAILABLE. Existing BUSY volunteers are never removed."""
+    current = len(VOLUNTEERS)
+    if n > current:
+        for i in range(current + 1, n + 1):
+            vid = f"V-{i:02d}"
+            if vid not in VOLUNTEERS:
+                VOLUNTEERS[vid] = _new_vol()
+    elif n < current:
+        # Remove only AVAILABLE volunteers from the tail
+        ids = sorted(VOLUNTEERS.keys(), reverse=True)
+        removed = 0
+        for vid in ids:
+            if len(VOLUNTEERS) - removed <= n:
+                break
+            if VOLUNTEERS[vid]["status"] == "AVAILABLE":
+                del VOLUNTEERS[vid]
+                removed += 1
+    print(f"[DISPATCH] Volunteer count set to {len(VOLUNTEERS)}")
+
+
+def get_volunteer_count() -> int:
+    return len(VOLUNTEERS)
 
 
 def get_free_volunteer() -> str | None:
@@ -106,7 +139,7 @@ def volunteer_return(
     · Restores returned items to inventory
     · Marks volunteer AVAILABLE
     · Marks request RESOLVED
-    · Immediately re-runs dispatch for next pending task
+    · Does NOT auto-dispatch — the shelter head triggers next assignment.
     """
     req_id = VOLUNTEERS[volunteer_id]["request_id"]
     now = datetime.now().strftime("%H:%M:%S")
@@ -131,4 +164,5 @@ def volunteer_return(
         "items_taken": [],
     }
 
-    dispatch(queue)  # immediately check for next pending task
+    # NOTE: We intentionally do NOT auto-dispatch here.
+    # The shelter head must manually trigger the next assignment.

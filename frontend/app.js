@@ -948,6 +948,80 @@ async function bootstrapApp() {
 
   // Timer tick interval uses configurable polling
   setInterval(tickTimers, DL_CONFIG.polling.timersMs);
+
+  // ── Volunteer Count Form ──────────────────────────────────────────────────
+  const volBtn = document.getElementById('btn-set-volunteers');
+  const volInput = document.getElementById('volunteer-count-input');
+  const volStatus = document.getElementById('volunteer-count-status');
+
+  async function submitVolunteerCount() {
+    const count = parseInt(volInput.value, 10);
+    if (!count || count < 1) {
+      if (volStatus) volStatus.textContent = '⚠ Enter a valid number ≥ 1';
+      return;
+    }
+    if (!window.api || typeof window.api.setVolunteerCount !== 'function') {
+      if (volStatus) volStatus.textContent = '⚠ API unavailable';
+      return;
+    }
+    volBtn.disabled = true;
+    try {
+      const resp = await window.api.setVolunteerCount(count);
+      VOLUNTEERS = resp.volunteers || [];
+      if (volStatus) volStatus.textContent = `✓ Set to ${resp.count ?? count} volunteers`;
+    } catch (err) {
+      if (volStatus) volStatus.textContent = `✗ ${err.message}`;
+    }
+    volBtn.disabled = false;
+  }
+
+  if (volBtn && volInput) {
+    volBtn.addEventListener('click', submitVolunteerCount);
+    volInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); submitVolunteerCount(); }
+    });
+  }
+
+  // ── Inventory Update Form ─────────────────────────────────────────────────
+  const invBtn = document.getElementById('btn-update-inventory');
+  const invItem = document.getElementById('inv-update-item');
+  const invQty = document.getElementById('inv-update-qty');
+  const invStatus = document.getElementById('inv-update-status');
+
+  async function submitInventoryUpdate() {
+    const item = invItem.value.trim();
+    const qty = parseInt(invQty.value, 10);
+    if (!item || !qty || qty < 1) {
+      if (invStatus) invStatus.textContent = '⚠ Enter item name and quantity';
+      return;
+    }
+    if (!window.api || typeof window.api.updateInventory !== 'function') {
+      if (invStatus) invStatus.textContent = '⚠ API unavailable';
+      return;
+    }
+    invBtn.disabled = true;
+    try {
+      const resp = await window.api.updateInventory(item, qty);
+      INVENTORY = resp.inventory || [];
+      renderInventory();
+      if (invStatus) invStatus.textContent = `✓ Added ${qty}× ${item}`;
+      invItem.value = '';
+      invQty.value = '';
+    } catch (err) {
+      if (invStatus) invStatus.textContent = `✗ ${err.message}`;
+    }
+    invBtn.disabled = false;
+  }
+
+  if (invBtn && invItem && invQty) {
+    invBtn.addEventListener('click', submitInventoryUpdate);
+    invItem.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); submitInventoryUpdate(); }
+    });
+    invQty.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); submitInventoryUpdate(); }
+    });
+  }
 }
 
 document.addEventListener('DOMContentLoaded', bootstrapApp);

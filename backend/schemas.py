@@ -128,6 +128,19 @@ class InventoryRefillRequest(BaseModel):
     mode: str = "partial"  # "partial" | "daily"
 
 
+class VolunteerCountRequest(BaseModel):
+    """POST /volunteers/count — set active volunteer count dynamically."""
+
+    count: int  # desired number of volunteers
+
+
+class InventoryUpdateRequest(BaseModel):
+    """POST /inventory/update — add stock for an item."""
+
+    item: str
+    quantity: int
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # API response shapes
 # ─────────────────────────────────────────────────────────────────────────────
