@@ -1022,6 +1022,47 @@ async function bootstrapApp() {
       if (e.key === 'Enter') { e.preventDefault(); submitInventoryUpdate(); }
     });
   }
+
+  // ── Create New Item Form ──────────────────────────────────────────────────
+  const createBtn = document.getElementById('btn-create-item');
+  const createItem = document.getElementById('inv-create-item');
+  const createCap = document.getElementById('inv-create-cap');
+  const createStatus = document.getElementById('inv-create-status');
+
+  async function submitCreateItem() {
+    const name = createItem.value.trim();
+    const cap = parseInt(createCap.value, 10);
+    if (!name || !cap || cap < 1) {
+      if (createStatus) createStatus.textContent = '⚠ Enter item name and capacity';
+      return;
+    }
+    if (!window.api || typeof window.api.createInventoryItem !== 'function') {
+      if (createStatus) createStatus.textContent = '⚠ API unavailable';
+      return;
+    }
+    createBtn.disabled = true;
+    try {
+      const resp = await window.api.createInventoryItem(name, cap);
+      INVENTORY = resp.inventory || [];
+      renderInventory();
+      if (createStatus) createStatus.textContent = `✓ Created ${name} (${cap}/${cap})`;
+      createItem.value = '';
+      createCap.value = '';
+    } catch (err) {
+      if (createStatus) createStatus.textContent = `✗ ${err.message}`;
+    }
+    createBtn.disabled = false;
+  }
+
+  if (createBtn && createItem && createCap) {
+    createBtn.addEventListener('click', submitCreateItem);
+    createItem.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); submitCreateItem(); }
+    });
+    createCap.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); submitCreateItem(); }
+    });
+  }
 }
 
 document.addEventListener('DOMContentLoaded', bootstrapApp);

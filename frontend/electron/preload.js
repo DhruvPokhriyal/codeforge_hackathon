@@ -103,8 +103,12 @@ contextBridge.exposeInMainWorld("api", {
     updateInventory: (item, quantity) =>
         apiCall("POST", "/inventory/update", { item, quantity }),
 
+    createInventoryItem: (item, quantity) =>
+        apiCall("POST", "/inventory/create", { item, quantity }),
+
     getQueue: () => apiCall("GET", "/queue"),
     getVolunteers: () => apiCall("GET", "/volunteers"),
     getInventory: () => apiCall("GET", "/inventory"),
+    getBuffer: () => apiCall("GET", "/inventory/buffer"),
     getSettings: () => apiCall("GET", "/settings/frontend"),
 });
