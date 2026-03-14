@@ -43,6 +43,7 @@
   --btn-process-text: #ffffff;
   --btn-approve-col: #006622;
   --btn-override-col: #cc6600;
+  --btn-control-text: #000000;
   --badge-in-prog-bg: #006622;
   --badge-in-prog-text: #ffffff;
   --badge-pending-bg: transparent;
@@ -81,6 +82,7 @@ html[data-theme="dark"] {
   --btn-process-text: #000000;
   --btn-approve-col: #34c759;
   --btn-override-col: #ff9500;
+  --btn-control-text: #ffffff;
   --badge-in-prog-bg: #34c759;
   --badge-in-prog-text: #000000;
   --badge-pending-bg: transparent;
@@ -117,6 +119,7 @@ html[data-theme="hc"] {
   --btn-process-text: #000000;
   --btn-approve-col: #00ff88;
   --btn-override-col: #ffaa00;
+  --btn-control-text: #ffffff;
   --badge-in-prog-bg: #00ff88;
   --badge-in-prog-text: #000000;
   --badge-pending-bg: transparent;
@@ -342,7 +345,7 @@ html[data-theme="hc"] .npu-btn {
   padding: 8px 18px;
   border: 2px solid var(--btn-approve-col);
   background: var(--btn-approve-col);
-  color: #fff;
+  color: var(--btn-control-text);
   font-size: 12px;
   font-weight: 800;
   letter-spacing: 0.08em;

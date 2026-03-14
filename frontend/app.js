@@ -237,7 +237,8 @@ function renderAiPanel() {
     </div>`).join('');
 
     const sources = sit.source_chunks || [];
-    const sourcesHtml = sources.map(s => `
+    const uniqueSources = [...new Set(sources)];
+    const sourcesHtml = uniqueSources.map(s => `
     <li class="source-item">
       <span class="source-icon">&#x1F4C4;</span>
       <span class="source-name">${s}</span>
@@ -322,7 +323,8 @@ function renderAiPanel() {
   }).join('');
 
   const sources = task.sources || task.source_chunks || sit0?.source_chunks || [];
-  const sourcesHtml = sources.map(s => `
+  const uniqueSources = [...new Set(sources)];
+  const sourcesHtml = uniqueSources.map(s => `
     <li class="source-item">
       <span class="source-icon">&#x1F4C4;</span>
       <span class="source-name">${s}</span>
