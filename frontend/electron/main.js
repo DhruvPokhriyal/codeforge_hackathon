@@ -14,6 +14,14 @@ const fs = require('fs');
 const { spawn } = require('child_process');
 const http = require('http');
 
+// ── WSL2 / Linux GPU workaround ──────────────────────────────────────────────
+// Electron's GPU compositor often fails under WSL2/Wayland. Disable it so the
+// BrowserWindow actually renders instead of silently failing.
+app.disableHardwareAcceleration();
+app.commandLine.appendSwitch('disable-gpu');
+app.commandLine.appendSwitch('disable-gpu-compositing');
+app.commandLine.appendSwitch('no-sandbox');
+
 let mainWindow = null;
 let backendProcess = null;
 

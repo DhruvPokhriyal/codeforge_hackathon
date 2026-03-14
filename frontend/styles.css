@@ -334,21 +334,21 @@ html[data-theme="hc"] .divider {
 
 /* ── Inventory List ──────────────────────────────────────────────────────────── */
 .inventory-list {
-  height: 50%;
+  height: 30%;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   margin-bottom: 2px;
 }
 
-.inv-item {}
+
 
 .inv-item-header {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  margin-bottom: 4px;
+  margin-bottom: 3px;
 }
 
 .inv-name {
@@ -384,8 +384,8 @@ html[data-theme="hc"] .divider {
 .inv-pct-row {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-top: 3px;
+  gap: 6px;
+  margin-top: 2px;
 }
 
 .inv-pct {
