@@ -92,6 +92,26 @@ function formatTimer(s) {
   });
 })();
 
+// ── NPU/CPU Switcher ────────────────────────────────────────────────────────────
+let currentNpuMode = false;
+(function initNpuMode() {
+  const savedMode = localStorage.getItem('dl-npu') || 'cpu';
+  currentNpuMode = savedMode === 'npu';
+
+  document.querySelectorAll('.npu-btn').forEach(btn => {
+    btn.classList.remove('active');
+    if (btn.dataset.mode === savedMode) btn.classList.add('active');
+
+    btn.addEventListener('click', () => {
+      const mode = btn.dataset.mode;
+      currentNpuMode = mode === 'npu';
+      document.querySelectorAll('.npu-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      localStorage.setItem('dl-npu', mode);
+    });
+  });
+})();
+
 // ── Render: Inventory ──────────────────────────────────────────────────────────
 function renderInventory() {
   const el = document.getElementById('inventory-list');
@@ -463,7 +483,8 @@ function tickTimers() {
             binary += String.fromCharCode(bytes[i]);
           }
           const audioB64 = btoa(binary);
-          const resp = await window.api.runPipeline(audioB64);
+          console.log('[app.js] Calling runPipeline, audio base64 length:', audioB64.length, 'npuMode:', currentNpuMode);
+          const resp = await window.api.runPipeline(audioB64, currentNpuMode);
 
 
           // Hold the latest pipeline result for HITL approval in the AI panel
@@ -876,9 +897,9 @@ async function bootstrapApp() {
         const resp = await window.api.getQueue();
         const newQueue = resp.queue || [];
         // Maintain timers only for active (non-resolved) requests
-        const activeIds = newQueue.filter(r => r.status !== 'RESOLVED').map(r => r.request_id);
+        const activeIds = new Set(newQueue.filter(r => r.status !== 'RESOLVED').map(r => r.request_id));
         Object.keys(REQUEST_TIMERS).forEach(id => {
-          if (!activeIds.includes(id)) {
+          if (!activeIds.has(id)) {
             delete REQUEST_TIMERS[id];
           }
         });

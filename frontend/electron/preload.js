@@ -71,7 +71,7 @@ function apiCall(method, path, body = null) {
 }
 
 contextBridge.exposeInMainWorld("api", {
-    runPipeline: (audio_b64) => apiCall("POST", "/pipeline", { audio_b64 }),
+    runPipeline: (audio_b64, npu_mode) => apiCall("POST", "/pipeline", { audio_b64, npu_mode }),
 
     approveReport: (request_id, selected_indices, manual_override = null) =>
         apiCall("POST", "/approve", {
