@@ -112,26 +112,6 @@ let currentNpuMode = false;
   });
 })();
 
-// ── NPU/CPU Switcher ────────────────────────────────────────────────────────────
-let currentNpuMode = false;
-(function initNpuMode() {
-  const savedMode = localStorage.getItem('dl-npu') || 'cpu';
-  currentNpuMode = savedMode === 'npu';
-
-  document.querySelectorAll('.npu-btn').forEach(btn => {
-    btn.classList.remove('active');
-    if (btn.dataset.mode === savedMode) btn.classList.add('active');
-
-    btn.addEventListener('click', () => {
-      const mode = btn.dataset.mode;
-      currentNpuMode = mode === 'npu';
-      document.querySelectorAll('.npu-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      localStorage.setItem('dl-npu', mode);
-    });
-  });
-})();
-
 // ── Render: Inventory ──────────────────────────────────────────────────────────
 function renderInventory() {
   const el = document.getElementById('inventory-list');
@@ -506,16 +486,6 @@ function tickTimers() {
           console.log('[app.js] Calling runPipeline, audio base64 length:', audioB64.length, 'npuMode:', currentNpuMode);
           const resp = await window.api.runPipeline(audioB64, currentNpuMode);
 
-          // DEBUG: Log the full response
-          console.log('[app.js] Pipeline response received:', JSON.stringify(resp).substring(0, 2000));
-          console.log('[app.js] Response keys:', Object.keys(resp));
-          console.log('[app.js] situations field:', typeof resp.situations, Array.isArray(resp.situations), 'length:', resp.situations?.length);
-          if (resp.situations?.length > 0) {
-            console.log('[app.js] situations[0] keys:', Object.keys(resp.situations[0]));
-            console.log('[app.js] situations[0].label:', resp.situations[0].label);
-          } else {
-            console.log('[app.js] WARNING: situations is empty or missing!');
-          }
 
           // Hold the latest pipeline result for HITL approval in the AI panel
           CURRENT_PIPELINE = resp;

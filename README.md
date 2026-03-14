@@ -68,21 +68,6 @@ Expected response:
 - Missing LLM model: place `gemma-3-1b-it-Q5_K_M.gguf` in `backend/models/`.
 - `ffmpeg` missing: install system package (`sudo apt install ffmpeg -y` on Ubuntu).
 
-### 6) NPU Mode Setup
-
-To save power, you can run LLM inference on your local Neural Processing Unit (NPU) by toggling "NPU" in the UI.
-- On **Macs**, this uses ONNX Runtime on the Apple Neural Engine (ANE).
-- On **Windows/Linux Intel machines**, this uses OpenVINO on the Intel Ultra Gen1 NPU.
-
-**Setup Script:**
-Before using NPU mode, you must run the included helper script to generate the proper ONNX or OpenVINO model format from HuggingFace.
-
-```bash
-pip install optimum[openvino,onnxruntime] transformers
-python backend/setup_npu_models.py
-```
-This script will automatically detect your OS and export the `gemma-3-1b-it` model to the correct directory (`backend/models/onnx` or `backend/models/openvino`).
-
 ---
 
 ## 🔄 Complete System Workflow

@@ -1,7 +1,6 @@
 import uuid
 import time
 from datetime import datetime
-from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
 
@@ -20,11 +19,6 @@ from utils.audio_utils import save_base64_wav, get_clean_path, cleanup_temp
 from utils.logger import log_handoff
 
 router = APIRouter()
-
-# Resolve model paths relative to this file, not the working directory
-_BASE_DIR = Path(__file__).parent.resolve()
-_ONNX_MODEL_PATH = str(_BASE_DIR / "models" / "onnx")
-_OPENVINO_MODEL_PATH = str(_BASE_DIR / "models" / "openvino")
 
 # LLM via Ollama — wrapper that mimics the llama-cpp interface
 _llm = None
@@ -141,15 +135,13 @@ def _get_llm(npu_mode: bool = False):
             import platform
             sys_os = platform.system()
             print(f"[LLM] NPU mode requested. Detected OS: {sys_os}")
-            print(f"[LLM] Resolved ONNX path:     {_ONNX_MODEL_PATH}")
-            print(f"[LLM] Resolved OpenVINO path: {_OPENVINO_MODEL_PATH}")
             try:
                 if sys_os == "Darwin":
                     print("[LLM] Initializing ONNX runtime for ANE...")
-                    _llm_npu = ONNXLLM(_ONNX_MODEL_PATH, n_ctx=LLM_CONTEXT_SIZE)
+                    _llm_npu = ONNXLLM("models/onnx", n_ctx=LLM_CONTEXT_SIZE)
                 else:
                     print("[LLM] Initializing OpenVINO for Intel NPU...")
-                    _llm_npu = OpenVINOLLM(_OPENVINO_MODEL_PATH, n_ctx=LLM_CONTEXT_SIZE)
+                    _llm_npu = OpenVINOLLM("models/openvino", n_ctx=LLM_CONTEXT_SIZE)
             except Exception as e:
                 print(f"[LLM] Error initializing NPU inference: {e}")
                 print("[LLM] Falling back to OllamaLLM for development purposes...")
