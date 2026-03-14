@@ -92,6 +92,26 @@ function formatTimer(s) {
   });
 })();
 
+// ── NPU/CPU Switcher ────────────────────────────────────────────────────────────
+let currentNpuMode = false;
+(function initNpuMode() {
+  const savedMode = localStorage.getItem('dl-npu') || 'cpu';
+  currentNpuMode = savedMode === 'npu';
+
+  document.querySelectorAll('.npu-btn').forEach(btn => {
+    btn.classList.remove('active');
+    if (btn.dataset.mode === savedMode) btn.classList.add('active');
+
+    btn.addEventListener('click', () => {
+      const mode = btn.dataset.mode;
+      currentNpuMode = mode === 'npu';
+      document.querySelectorAll('.npu-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      localStorage.setItem('dl-npu', mode);
+    });
+  });
+})();
+
 // ── Render: Inventory ──────────────────────────────────────────────────────────
 function renderInventory() {
   const el = document.getElementById('inventory-list');
@@ -470,8 +490,8 @@ function tickTimers() {
             binary += String.fromCharCode(bytes[i]);
           }
           const audioB64 = btoa(binary);
-          console.log('[app.js] Calling runPipeline, audio base64 length:', audioB64.length);
-          const resp = await window.api.runPipeline(audioB64);
+          console.log('[app.js] Calling runPipeline, audio base64 length:', audioB64.length, 'npuMode:', currentNpuMode);
+          const resp = await window.api.runPipeline(audioB64, currentNpuMode);
 
           // DEBUG: Log the full response
           console.log('[app.js] Pipeline response received:', JSON.stringify(resp).substring(0, 2000));

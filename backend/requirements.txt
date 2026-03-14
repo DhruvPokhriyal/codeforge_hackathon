@@ -33,6 +33,7 @@ transformers==5.3.0
 # LLM inference (CPU) — compiled from source; prebuilt wheels available at:
 # https://abetlen.github.io/llama-cpp-python/whl/cpu
 llama_cpp_python==0.3.16
+openvino-genai==2026.0.0.0
 
 # Inventory
 pandas==3.0.1
