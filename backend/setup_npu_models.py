@@ -2,7 +2,7 @@
 """
 setup_npu_models.py
 
-Utility script to download and export the Gemma 3 1B model into the
+Utility script to download and export the Gemma 3 1B model into the 
 correct format for NPU inference (ONNX for Mac ANE, OpenVINO for Intel NPU).
 
 Usage:
@@ -14,6 +14,7 @@ Dependencies (install before running):
 
 import os
 import platform
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -36,23 +37,28 @@ def check_dependencies():
         print("Please install it: pip install optimum[openvino,onnxruntime] transformers")
         sys.exit(1)
 
+def purge_dir(path: Path):
+    if path.exists():
+        print(f"Purging existing directory: {path}")
+        shutil.rmtree(path)
+        print("Purged.")
+
 def main():
     check_dependencies()
-
+    
     base_dir = Path(__file__).parent.resolve()
     models_dir = base_dir / "models"
     models_dir.mkdir(exist_ok=True)
-
+    
     sys_os = platform.system()
-
+    
     if sys_os == "Darwin":
         print(f"Detected macOS. Exporting {MODEL_ID} to ONNX format for Apple Neural Engine...")
         out_dir = models_dir / "onnx"
         if out_dir.exists():
             print(f"Directory {out_dir} already exists. Skipping export.")
             return
-
-        # Using optimum-cli to export to ONNX
+            
         cmd = [
             sys.executable, "-m", "optimum.exporters.onnx",
             "--model", MODEL_ID,
@@ -61,20 +67,20 @@ def main():
         ]
         run_command(cmd)
         print(f"\n✅ ONNX model successfully exported to: {out_dir}")
-
+        
     else:
         print(f"Detected {sys_os}. Exporting {MODEL_ID} to OpenVINO IR format for Intel NPU...")
         out_dir = models_dir / "openvino"
-        if out_dir.exists():
-            print(f"Directory {out_dir} already exists. Skipping export.")
-            return
 
-        # Using optimum-cli to export to OpenVINO
+        # Purge old export (e.g. stale int8 build) before re-exporting
+        purge_dir(out_dir)
+
+        # int4 is required for Intel Core Ultra Gen1 NPU compile budget
         cmd = [
             "optimum-cli", "export", "openvino",
             "--model", MODEL_ID,
             "--task", "text-generation-with-past",
-            "--weight-format", "int8", # recommended for NPU
+            "--weight-format", "int4",
             str(out_dir)
         ]
         run_command(cmd)

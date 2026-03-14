@@ -22,7 +22,7 @@ from utils.logger import log_handoff
 router = APIRouter()
 
 # Resolve model paths relative to this file, not the working directory
-_BASE_DIR = Path(__file__).parent.resolve()
+_BASE_DIR = Path(__file__).parent.parent.resolve()
 _ONNX_MODEL_PATH = str(_BASE_DIR / "models" / "onnx")
 _OPENVINO_MODEL_PATH = str(_BASE_DIR / "models" / "openvino")
 
@@ -142,7 +142,7 @@ def _get_llm(npu_mode: bool = False):
             sys_os = platform.system()
             print(f"[LLM] NPU mode requested. Detected OS: {sys_os}")
             print(f"[LLM] Resolved ONNX path:     {_ONNX_MODEL_PATH}")
-            print(f"[LLM] Resolved OpenVINO path: {_OPENVINO_MODEL_PATH}")
+            print(f"[LLM] Resolved OpenVINO path: {_OPENVINO_MODEL_PATH}", flush=True)
             try:
                 if sys_os == "Darwin":
                     print("[LLM] Initializing ONNX runtime for ANE...")
@@ -151,7 +151,7 @@ def _get_llm(npu_mode: bool = False):
                     print("[LLM] Initializing OpenVINO for Intel NPU...")
                     _llm_npu = OpenVINOLLM(_OPENVINO_MODEL_PATH, n_ctx=LLM_CONTEXT_SIZE)
             except Exception as e:
-                print(f"[LLM] Error initializing NPU inference: {e}")
+                print(f"[LLM] Error initializing NPU inference: {e}", flush=True)
                 print("[LLM] Falling back to OllamaLLM for development purposes...")
                 import requests
                 _llm_npu = OllamaLLM(base_url=OLLAMA_URL, model=OLLAMA_MODEL, n_ctx=LLM_CONTEXT_SIZE)
