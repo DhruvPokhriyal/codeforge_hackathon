@@ -188,29 +188,22 @@ function renderAiPanel() {
   const content = document.getElementById('ai-panel-content');
   if (!content) return;
 
-  console.log('[renderAiPanel] mode:', aiPanelMode, 'CURRENT_PIPELINE:', !!CURRENT_PIPELINE);
 
   updateAiModeUi();
   updateAiActionsVisibility();
 
   if (aiPanelMode === 'incoming') {
     if (!CURRENT_PIPELINE) {
-      console.log('[renderAiPanel] CURRENT_PIPELINE is null/undefined');
       content.innerHTML = '<div class="ai-no-selection">No incoming task awaiting approval.</div>';
       return;
     }
 
-    console.log('[renderAiPanel] CURRENT_PIPELINE keys:', Object.keys(CURRENT_PIPELINE));
-    console.log('[renderAiPanel] CURRENT_PIPELINE.situations:', typeof CURRENT_PIPELINE.situations, Array.isArray(CURRENT_PIPELINE.situations), 'length:', CURRENT_PIPELINE.situations?.length);
-    console.log('[renderAiPanel] CURRENT_PIPELINE.situations value:', JSON.stringify(CURRENT_PIPELINE.situations)?.substring(0, 1000));
 
     const sit = CURRENT_PIPELINE.situations?.[0];
     if (!sit) {
-      console.log('[renderAiPanel] sit is falsy! situations[0]:', CURRENT_PIPELINE.situations?.[0]);
       content.innerHTML = '<div class="ai-no-selection">No situations returned from pipeline.</div>';
       return;
     }
-    console.log('[renderAiPanel] sit.label:', sit.label, 'sit.severity:', sit.severity);
     const priority = sit.severity || 'HIGH';
     const severityCls = priority === 'CRITICAL' ? 'critical-text' : 'high-text';
 
@@ -470,19 +463,8 @@ function tickTimers() {
             binary += String.fromCharCode(bytes[i]);
           }
           const audioB64 = btoa(binary);
-          console.log('[app.js] Calling runPipeline, audio base64 length:', audioB64.length);
           const resp = await window.api.runPipeline(audioB64);
 
-          // DEBUG: Log the full response
-          console.log('[app.js] Pipeline response received:', JSON.stringify(resp).substring(0, 2000));
-          console.log('[app.js] Response keys:', Object.keys(resp));
-          console.log('[app.js] situations field:', typeof resp.situations, Array.isArray(resp.situations), 'length:', resp.situations?.length);
-          if (resp.situations?.length > 0) {
-            console.log('[app.js] situations[0] keys:', Object.keys(resp.situations[0]));
-            console.log('[app.js] situations[0].label:', resp.situations[0].label);
-          } else {
-            console.log('[app.js] WARNING: situations is empty or missing!');
-          }
 
           // Hold the latest pipeline result for HITL approval in the AI panel
           CURRENT_PIPELINE = resp;
