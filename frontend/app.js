@@ -914,9 +914,9 @@ async function bootstrapApp() {
         const resp = await window.api.getQueue();
         const newQueue = resp.queue || [];
         // Maintain timers only for active (non-resolved) requests
-        const activeIds = newQueue.filter(r => r.status !== 'RESOLVED').map(r => r.request_id);
+        const activeIds = new Set(newQueue.filter(r => r.status !== 'RESOLVED').map(r => r.request_id));
         Object.keys(REQUEST_TIMERS).forEach(id => {
-          if (!activeIds.includes(id)) {
+          if (!activeIds.has(id)) {
             delete REQUEST_TIMERS[id];
           }
         });
